@@ -42,7 +42,7 @@ def main():
         print("=" * 80)
         print("WARNING: OPENVINO_LOG_LEVEL is not set to INFO or higher!")
         print("To see Eagle3 trace logs, please run:")
-        print("  export OPENVINO_LOG_LEVEL=INFO")
+        print("  export OPENVINO_LOG_LEVEL=INFO    # or DEBUG, or TRACE for more verbose output")
         print("  python", " ".join(sys.argv))
         print("=" * 80)
         print()
