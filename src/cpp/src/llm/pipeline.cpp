@@ -162,8 +162,11 @@ static std::unique_ptr<LLMPipelineImplBase> create(const std::shared_ptr<ov::Mod
         bool is_eagle3_mode = draft_model_descr.properties.find("eagle3_mode") != draft_model_descr.properties.end() &&
                               draft_model_descr.properties.at("eagle3_mode").as<bool>();
 
+        GENAI_INFO("[EAGLE3_TRACE] Draft model detected, eagle3_mode: %s", is_eagle3_mode ? "true" : "false");
+
         if (is_eagle3_mode) {
             // Eagle3 Speculative Decoding mode
+            GENAI_INFO("[EAGLE3_TRACE] Initializing StatefulEagle3LLMPipeline");
             auto eagle_rt_info = utils::eagle3::extract_eagle3_info_from_config(draft_model_descr.properties, models_path);
             if (!eagle_rt_info.hidden_layers_list.empty()) {
                 draft_model_descr.properties["hidden_layers_list"] = eagle_rt_info.hidden_layers_list;
@@ -171,6 +174,7 @@ static std::unique_ptr<LLMPipelineImplBase> create(const std::shared_ptr<ov::Mod
             return std::make_unique<StatefulEagle3LLMPipeline>(main_model_descr, draft_model_descr);
         } else {
             // Standard Speculative Decoding mode (FastDraft)
+            GENAI_INFO("[EAGLE3_TRACE] Initializing StatefulSpeculativeLLMPipeline (FastDraft mode)");
             return std::make_unique<StatefulSpeculativeLLMPipeline>(main_model_descr, draft_model_descr);
         }
     }
