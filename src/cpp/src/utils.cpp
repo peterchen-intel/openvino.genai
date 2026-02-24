@@ -386,7 +386,6 @@ std::tuple<ov::AnyMap, bool, ov::genai::OVModelQuantizeMode> extract_gguf_proper
 
     // Check save_ov_model_quantize_mode - controls quantization strategy
     // Supports both enum and string values: "ORIGINAL", "GPU_OPTIMIZED", or enum directly
-    bool config_mode_set = false;
     auto config_it = properties.find(ov::genai::save_ov_model_quantize_mode.name());
     if (config_it != properties.end()) {
         if (config_it->second.is<ov::genai::OVModelQuantizeMode>()) {
@@ -399,7 +398,6 @@ std::tuple<ov::AnyMap, bool, ov::genai::OVModelQuantizeMode> extract_gguf_proper
             OPENVINO_THROW("save_ov_model_quantize_mode must be either OVModelQuantizeMode enum or string (ORIGINAL/GPU_OPTIMIZED)");
         }
         properties.erase(config_it);
-        config_mode_set = true;
     }
 
     // Determine should_save_file:
