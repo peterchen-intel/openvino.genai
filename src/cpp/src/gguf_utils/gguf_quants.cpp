@@ -366,6 +366,7 @@ void quantize_q8_0(const float* src,
                    int64_t n_elements,
                    int64_t block_size) {
     OPENVINO_ASSERT(n_elements % block_size == 0, "n_elements must be divisible by block_size");
+    OPENVINO_ASSERT(block_size % 4 == 0, "block_size must be divisible by 4 for Q8_0 quantization");
 
     const int64_t num_blocks = n_elements / block_size;
 
