@@ -5,7 +5,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iosfwd>
 #include <optional>
+#include <sstream>
 #include <variant>
 #include <chrono>
 #include <filesystem>
