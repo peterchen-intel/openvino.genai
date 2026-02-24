@@ -350,5 +350,6 @@ def test_full_gguf_pipeline_quantize_mode(
         gc.collect()
 
 
+    # In this fixed short-generation setup, outputs are expected to match exactly.
     assert outputs["ORIGINAL"] == outputs["GPU_OPTIMIZED"], \
         f"Outputs must be identical!\nORIGINAL: {outputs['ORIGINAL']}\nGPU_OPTIMIZED: {outputs['GPU_OPTIMIZED']}"
