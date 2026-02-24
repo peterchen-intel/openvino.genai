@@ -661,6 +661,9 @@ ov::Output<ov::Node> make_int4_weights(
     // Infer effective group_size from scales metadata.
     // Needed when model uses channel-wise quantization (num_groups == 1)
     // or non-default block sizes, where configured/default group_size may not match.
+    OPENVINO_ASSERT(scales.get_shape().size() == 2,
+                    "Invalid scales rank for ", key,
+                    ": expected 2D [rows, num_groups], got rank ", scales.get_shape().size());
     size_t num_groups = scales.get_shape()[1];
     OPENVINO_ASSERT(num_groups > 0, "Invalid scales shape for ", key, ": num_groups must be > 0");
     OPENVINO_ASSERT(orig_weight_shape[1] % num_groups == 0,
