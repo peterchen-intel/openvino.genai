@@ -5,6 +5,7 @@
 #include <type_traits>
 #include <optional>
 #include <stdexcept>
+#include <tuple>
 #include <utility>
 
 #include "openvino/genai/llm_pipeline.hpp"
