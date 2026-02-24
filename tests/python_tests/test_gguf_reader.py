@@ -299,9 +299,6 @@ def test_ov_model_quantize_mode_log_verification(
     assert expected_log in output, \
         f"Expected log '{expected_log}' not found in output:\n{output}"
     
-    print(f"✓ Test passed: mode={save_ov_model_quantize_mode}, enable_save_ov_model={enable_save_ov_model}")
-
-
 @pytest.mark.parametrize("model_gguf", [GGUF_MODEL_LIST[0]], indirect=True)
 def test_full_gguf_pipeline_quantize_mode(
     model_gguf: ModelInfo,
@@ -336,9 +333,6 @@ def test_full_gguf_pipeline_quantize_mode(
         del pipe
         gc.collect()
         
-        print(f"✓ {mode}: output_length={len(output)}")
-    
+
     assert outputs["ORIGINAL"] == outputs["GPU_OPTIMIZED"], \
         f"Outputs must be identical!\nORIGINAL: {outputs['ORIGINAL']}\nGPU_OPTIMIZED: {outputs['GPU_OPTIMIZED']}"
-    
-    print(f"✓ Inference correctness validated: ORIGINAL == GPU_OPTIMIZED")
