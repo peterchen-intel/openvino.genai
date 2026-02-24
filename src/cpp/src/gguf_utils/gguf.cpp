@@ -37,9 +37,11 @@ static void gguf_q4_k_to_f16(void* weights_data, void* dst, uint64_t count) {
     for (uint64_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         uint8_t* block = src + block_idx * BYTES_PER_BLOCK;
         
-        // Read scales and mins meta-quantization factors
-        uint16_t scales_d_bits = *reinterpret_cast<uint16_t*>(block);
-        uint16_t scales_m_bits = *reinterpret_cast<uint16_t*>(block + 2);
+        // Read scales/mins meta-quantization factors using unaligned-safe loads.
+        uint16_t scales_d_bits;
+        std::memcpy(&scales_d_bits, block, sizeof(scales_d_bits));
+        uint16_t scales_m_bits;
+        std::memcpy(&scales_m_bits, block + 2, sizeof(scales_m_bits));
         float scales_d = from_half(scales_d_bits);
         float scales_m = from_half(scales_m_bits);
         
