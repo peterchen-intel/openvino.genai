@@ -31,9 +31,15 @@ static void gguf_q4_k_to_f16(void* weights_data, void* dst, uint64_t count) {
     
     uint8_t* src = static_cast<uint8_t*>(weights_data);
     uint16_t* output = static_cast<uint16_t*>(dst);
-    
-    uint64_t num_blocks = count / BLOCK_SIZE;
-    
+
+    const uint64_t num_blocks = count / static_cast<uint64_t>(BLOCK_SIZE);
+    const uint64_t remainder = count % static_cast<uint64_t>(BLOCK_SIZE);
+    OPENVINO_ASSERT(remainder == 0,
+                    "[load_gguf] gguf_q4_k_to_f16 expects count to be a multiple of ",
+                    BLOCK_SIZE,
+                    ", but got count = ",
+                    count);
+
     for (uint64_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         uint8_t* block = src + block_idx * BYTES_PER_BLOCK;
         
