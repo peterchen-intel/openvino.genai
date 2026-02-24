@@ -13,6 +13,7 @@
 #include "openvino/opsets/opset13.hpp"
 
 #include "gguf_utils/building_blocks.hpp"
+#include "utils.hpp"
 
 using namespace ov;
 using namespace ov::op::v13;
@@ -585,9 +586,10 @@ ov::Output<ov::Node> make_int8_weights(
     const bool channel_wise = num_groups == 1;
     const bool accepted_size = inferred_group_size == group_size || inferred_group_size == NNCF_QUANTIZATION_GROUP_SIZE;
     if (!channel_wise && !accepted_size) {
-        std::cerr << "[ WARNING ] group_size mismatch for " << key
-                  << ": requested=" << group_size
-                  << ", inferred=" << inferred_group_size << std::endl;
+        ov::genai::utils::print_gguf_debug_info(
+            "group_size mismatch for " + key +
+            ": requested=" + std::to_string(group_size) +
+            ", inferred=" + std::to_string(inferred_group_size));
     }
     // Use scales-derived group_size as the single source of truth for layout-consistent dequantization.
     group_size = inferred_group_size;
@@ -676,9 +678,10 @@ ov::Output<ov::Node> make_int4_weights(
     const bool channel_wise = num_groups == 1;
     const bool accepted_size = inferred_group_size == group_size || inferred_group_size == NNCF_QUANTIZATION_GROUP_SIZE;
     if (!channel_wise && !accepted_size) {
-        std::cerr << "[ WARNING ] group_size mismatch for " << key
-                  << ": requested=" << group_size
-                  << ", inferred=" << inferred_group_size << std::endl;
+        ov::genai::utils::print_gguf_debug_info(
+            "group_size mismatch for " + key +
+            ": requested=" + std::to_string(group_size) +
+            ", inferred=" + std::to_string(inferred_group_size));
     }
     // Use scales-derived group_size as the single source of truth for layout-consistent dequantization.
     group_size = inferred_group_size;
