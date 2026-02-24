@@ -570,8 +570,17 @@ ov::Output<ov::Node> make_int8_weights(
     
     // Infer group_size from scales shape if possible (for channel-wise quantization)
     size_t num_groups = scales.get_shape()[1];
+    OPENVINO_ASSERT(num_groups > 0, "Invalid scales shape for ", key, ": num_groups must be > 0");
+    OPENVINO_ASSERT(orig_shape[1] % num_groups == 0,
+                    "Inconsistent quantization layout for ", key,
+                    ": expanded weight dimension ", orig_shape[1],
+                    " is not divisible by num_groups ", num_groups);
     size_t inferred_group_size = orig_shape[1] / num_groups;
     if (inferred_group_size != group_size) {
+        std::cerr << "[ WARNING ] Overriding group_size for " << key
+                  << ": requested=" << group_size
+                  << ", inferred=" << inferred_group_size
+                  << ". Using inferred value based on scales shape." << std::endl;
         // Use inferred group_size for channel-wise quantization
         group_size = inferred_group_size;
     }
@@ -646,8 +655,17 @@ ov::Output<ov::Node> make_int4_weights(
     
     // Infer group_size from scales shape if possible (for flexible block sizes)
     size_t num_groups = scales.get_shape()[1];
+    OPENVINO_ASSERT(num_groups > 0, "Invalid scales shape for ", key, ": num_groups must be > 0");
+    OPENVINO_ASSERT(orig_weight_shape[1] % num_groups == 0,
+                    "Inconsistent quantization layout for ", key,
+                    ": expanded weight dimension ", orig_weight_shape[1],
+                    " is not divisible by num_groups ", num_groups);
     size_t inferred_group_size = orig_weight_shape[1] / num_groups;
     if (inferred_group_size != group_size) {
+        std::cerr << "[ WARNING ] Overriding group_size for " << key
+                  << ": requested=" << group_size
+                  << ", inferred=" << inferred_group_size
+                  << ". Using inferred value based on scales shape." << std::endl;
         // Use inferred group_size for different quantization granularity
         group_size = inferred_group_size;
     }
