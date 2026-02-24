@@ -19,6 +19,7 @@ using namespace ov::op::v13;
 using namespace ov::op;
 
 static const size_t GGML_QUANTIZATION_GROUP_SIZE = 32;
+static const size_t NNCF_QUANTIZATION_GROUP_SIZE = 128;
 
 Output<ov::Node> causal_mask(
     const Output<ov::Node>& attention_mask,
@@ -581,14 +582,15 @@ ov::Output<ov::Node> make_int8_weights(
                     ": expanded weight dimension ", orig_shape[1],
                     " is not divisible by num_groups ", num_groups);
     size_t inferred_group_size = orig_shape[1] / num_groups;
-    if (inferred_group_size != group_size) {
-        std::cerr << "[ WARNING ] Overriding group_size for " << key
+    const bool channel_wise = num_groups == 1;
+    const bool accepted_size = inferred_group_size == group_size || inferred_group_size == NNCF_QUANTIZATION_GROUP_SIZE;
+    if (!channel_wise && !accepted_size) {
+        std::cerr << "[ WARNING ] group_size mismatch for " << key
                   << ": requested=" << group_size
-                  << ", inferred=" << inferred_group_size
-                  << ". Using inferred value based on scales shape." << std::endl;
-        // Keep compatibility: use scales-derived group_size for layout-consistent dequantization.
-        group_size = inferred_group_size;
+                  << ", inferred=" << inferred_group_size << std::endl;
     }
+    // Use scales-derived group_size as the single source of truth for layout-consistent dequantization.
+    group_size = inferred_group_size;
 
     // Expand dimensions for scales and biases
     auto scale_shape = scales.get_shape();
@@ -671,14 +673,15 @@ ov::Output<ov::Node> make_int4_weights(
                     ": expanded weight dimension ", orig_weight_shape[1],
                     " is not divisible by num_groups ", num_groups);
     size_t inferred_group_size = orig_weight_shape[1] / num_groups;
-    if (inferred_group_size != group_size) {
-        std::cerr << "[ WARNING ] Overriding group_size for " << key
+    const bool channel_wise = num_groups == 1;
+    const bool accepted_size = inferred_group_size == group_size || inferred_group_size == NNCF_QUANTIZATION_GROUP_SIZE;
+    if (!channel_wise && !accepted_size) {
+        std::cerr << "[ WARNING ] group_size mismatch for " << key
                   << ": requested=" << group_size
-                  << ", inferred=" << inferred_group_size
-                  << ". Using inferred value based on scales shape." << std::endl;
-        // Keep compatibility: use scales-derived group_size for layout-consistent dequantization.
-        group_size = inferred_group_size;
+                  << ", inferred=" << inferred_group_size << std::endl;
     }
+    // Use scales-derived group_size as the single source of truth for layout-consistent dequantization.
+    group_size = inferred_group_size;
 
     // Expand dimensions for scales and biases
     ov::Shape scale_bias_shape = scales.get_shape();
