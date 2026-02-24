@@ -147,7 +147,7 @@ std::shared_ptr<ov::Model> create_from_gguf(const std::string& model_path,
     ov::genai::utils::print_gguf_debug_info(ss.str());
 
     ss.str("");
-    ss << "[DEBUG] OVModelQuantizeMode: quantization_mode="
+    ss << "OVModelQuantizeMode: quantization_mode="
        << (save_ov_model_quantize_mode == ov::genai::OVModelQuantizeMode::ORIGINAL ? "ORIGINAL" : "GPU_OPTIMIZED")
        << ", save_file=" << (enable_save_ov_model ? "YES" : "NO");
     ov::genai::utils::print_gguf_debug_info(ss.str());
