@@ -6,6 +6,7 @@
 #include <memory>
 #include <numeric>
 #include <algorithm>
+#include <cmath>
 #include <openvino/core/parallel.hpp>
 #include <sstream>
 
@@ -304,8 +305,8 @@ void quantize_q4_0(const float* src,
 
         for (int64_t j = 0; j < block_size; j++) {
             float v = src[i * block_size + j];
-            if (fabsf(v) > amax) {
-                amax = fabsf(v);
+            if (std::fabs(v) > amax) {
+                amax = std::fabs(v);
                 max_val = v;
             }
         }
@@ -379,8 +380,8 @@ void quantize_q8_0(const float* src,
 
         for (int64_t j = 0; j < block_size; j++) {
             float v = src[i * block_size + j];
-            if (fabsf(v) > amax) {
-                amax = fabsf(v);
+            if (std::fabs(v) > amax) {
+                amax = std::fabs(v);
             }
         }
 
@@ -399,7 +400,7 @@ void quantize_q8_0(const float* src,
             uint32_t packed = 0;
             for (int k = 0; k < 4; k++) {
                 float x0 = src[i * block_size + j + k] * id;
-                int8_t xi0 = static_cast<int8_t>(roundf(x0));
+                int8_t xi0 = static_cast<int8_t>(std::round(x0));
                 uint8_t u8_val = static_cast<uint8_t>(xi0 + 128);
                 packed |= (static_cast<uint32_t>(u8_val) << (k * 8));
             }
