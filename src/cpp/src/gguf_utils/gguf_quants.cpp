@@ -401,7 +401,8 @@ void quantize_q8_0(const float* src,
             uint32_t packed = 0;
             for (int k = 0; k < 4; k++) {
                 float x0 = src[i * block_size + j + k] * id;
-                int8_t xi0 = static_cast<int8_t>(std::round(x0));
+                int xi0_i32 = std::clamp(static_cast<int>(std::round(x0)), -128, 127);
+                int8_t xi0 = static_cast<int8_t>(xi0_i32);
                 uint8_t u8_val = static_cast<uint8_t>(xi0 + 128);
                 packed |= (static_cast<uint32_t>(u8_val) << (k * 8));
             }
