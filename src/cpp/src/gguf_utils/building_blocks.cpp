@@ -568,7 +568,9 @@ ov::Output<ov::Node> make_int8_weights(
     ov::Shape orig_shape = weight.get_shape();
     orig_shape[1] *= sizeof(uint32_t) / sizeof(uint8_t);
     
-    // Infer group_size from scales shape if possible (for channel-wise quantization)
+    // Infer effective group_size from scales metadata.
+    // Needed when model uses channel-wise quantization (num_groups == 1)
+    // or non-default block sizes, where configured/default group_size may not match.
     size_t num_groups = scales.get_shape()[1];
     OPENVINO_ASSERT(num_groups > 0, "Invalid scales shape for ", key, ": num_groups must be > 0");
     OPENVINO_ASSERT(orig_shape[1] % num_groups == 0,
@@ -581,7 +583,7 @@ ov::Output<ov::Node> make_int8_weights(
                   << ": requested=" << group_size
                   << ", inferred=" << inferred_group_size
                   << ". Using inferred value based on scales shape." << std::endl;
-        // Use inferred group_size for channel-wise quantization
+        // Keep compatibility: use scales-derived group_size for layout-consistent dequantization.
         group_size = inferred_group_size;
     }
 
@@ -653,7 +655,9 @@ ov::Output<ov::Node> make_int4_weights(
     ov::Tensor scales = get_tensor(consts, key + ".scales");
     ov::Tensor biases = get_tensor(consts, key + ".biases");
     
-    // Infer group_size from scales shape if possible (for flexible block sizes)
+    // Infer effective group_size from scales metadata.
+    // Needed when model uses channel-wise quantization (num_groups == 1)
+    // or non-default block sizes, where configured/default group_size may not match.
     size_t num_groups = scales.get_shape()[1];
     OPENVINO_ASSERT(num_groups > 0, "Invalid scales shape for ", key, ": num_groups must be > 0");
     OPENVINO_ASSERT(orig_weight_shape[1] % num_groups == 0,
@@ -666,7 +670,7 @@ ov::Output<ov::Node> make_int4_weights(
                   << ": requested=" << group_size
                   << ", inferred=" << inferred_group_size
                   << ". Using inferred value based on scales shape." << std::endl;
-        // Use inferred group_size for different quantization granularity
+        // Keep compatibility: use scales-derived group_size for layout-consistent dequantization.
         group_size = inferred_group_size;
     }
 
