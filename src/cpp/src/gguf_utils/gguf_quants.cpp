@@ -5,6 +5,7 @@
 #include <cstring>
 #include <memory>
 #include <numeric>
+#include <algorithm>
 #include <openvino/core/parallel.hpp>
 #include <sstream>
 
@@ -342,8 +343,8 @@ void quantize_q4_0(const float* src,
                 float x1 = src[idx1] * id;
 
                 // Clamp to [0, 15] range (4-bit)
-                uint8_t q0 = std::min(15, static_cast<int>(x0 + 8.5f));
-                uint8_t q1 = std::min(15, static_cast<int>(x1 + 8.5f));
+                uint8_t q0 = static_cast<uint8_t>(std::clamp(static_cast<int>(x0 + 8.5f), 0, 15));
+                uint8_t q1 = static_cast<uint8_t>(std::clamp(static_cast<int>(x1 + 8.5f), 0, 15));
 
                 // Pack: low 4 bits = q0, high 4 bits = q1
                 uint8_t byte_val = q0 | (q1 << 4);
