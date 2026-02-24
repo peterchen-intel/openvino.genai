@@ -210,7 +210,8 @@ ov::Tensor extract_tensor_data(gguf_tensor* tensor) {
 
     auto shape = get_shape(*tensor);
     const size_t new_size = tensor->num_weights * sizeof(int16_t);
-    // Use u16 to store FP16 bit representation (matches OpenVINO requirement)
+    // Use u16 as FP16 bit-pattern storage for the dequant staging path.
+    // This is a transport representation for half bits, not integer compute semantics.
     ov::Tensor weights(ov::element::u16, shape);
     memcpy(weights.data(), data, new_size);
     free(data);
@@ -397,7 +398,7 @@ void load_arrays(gguf_ctx* ctx,
         if ((tensor.type == GGUF_TYPE_Q4_0 || tensor.type == GGUF_TYPE_Q4_K || tensor.type == GGUF_TYPE_Q6_K) &&
             is_gpu_optimized) {
             std::string name(tensor.name, tensor.namelen);
-            ov::Tensor fp16_tensor = extract_tensor_data(&tensor);
+            ov::Tensor fp16_bits_tensor = extract_tensor_data(&tensor);
 
             constexpr std::string_view weight_suffix = ".weight";
             const std::string name_prefix = name.substr(0, name.length() - weight_suffix.length());
@@ -408,13 +409,15 @@ void load_arrays(gguf_ctx* ctx,
                 bool is_output = (name == "output.weight");
 
                 bool use_q8_0 = (is_token_embd || is_output);
-                int64_t block_size = use_q8_0 ? static_cast<int64_t>(fp16_tensor.get_shape()[1]) : 128;
+                int64_t block_size = use_q8_0 ? static_cast<int64_t>(fp16_bits_tensor.get_shape()[1]) : 128;
 
-                // Convert FP16 → FP32
-                auto shape = fp16_tensor.get_shape();
-                int64_t n_elements = fp16_tensor.get_size();
+                // Decode FP16 bit-pattern storage (u16) to FP32 values for requantization.
+                auto shape = fp16_bits_tensor.get_shape();
+                int64_t n_elements = fp16_bits_tensor.get_size();
                 std::vector<float> fp32_data(n_elements);
-                const uint16_t* fp16_ptr = fp16_tensor.data<uint16_t>();
+                OPENVINO_ASSERT(fp16_bits_tensor.get_element_type() == ov::element::u16,
+                                "[load_gguf] Expected FP16 bit-pattern tensor in u16 storage");
+                const uint16_t* fp16_ptr = fp16_bits_tensor.data<uint16_t>();
                 for (int64_t i = 0; i < n_elements; i++) {
                     fp32_data[i] = from_half(fp16_ptr[i]);
                 }
