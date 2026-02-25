@@ -804,10 +804,6 @@ jobs:
           npm install ${{ env.SRC_DIR }}/src/js
           npm install --verbose
 
-      - name : Install specific optimum-intel for eagle3 samples
-        if: ${{ matrix.test.marker == 'eagle3_decoding' && matrix.test.run_condition }}
-        run: |
-
       - name: Test Samples (Python and C++)
         if: ${{ matrix.test.run_condition }}
         run: python -m pytest -vvs ${{ env.SRC_DIR }}/${{ matrix.test.cmd }} -m "${{ matrix.test.marker }}"
