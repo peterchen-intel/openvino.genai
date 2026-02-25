@@ -248,13 +248,13 @@ def download_and_convert_model(model_id: str, **tokenizer_kwargs) -> OVConverted
     return download_and_convert_model_class(model_id, OVModelForCausalLM, **tokenizer_kwargs)
 
 
+def sanitize_model_id(model_id: str) -> str:
+    return model_id.replace("/", "_")
+
+
 TRUST_REMOTE_CODE_MODELS = (
     "AngelSlim/Qwen3-1.7B_eagle3",
 )
-
-
-def sanitize_model_id(model_id: str) -> str:
-    return model_id.replace("/", "_")
 
 
 def download_and_convert_model_class(
