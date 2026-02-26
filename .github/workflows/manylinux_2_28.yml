@@ -516,7 +516,6 @@ jobs:
             cmd: 'python -m pytest -v ./tests/python_tests/test_video_generation.py --override-ini cache_dir=/mount/caches/pytest/'
             run_condition: ${{ fromJSON(needs.smart_ci.outputs.affected_components).video_generation.test }}
             timeout: 60
-
           - name: 'GGUF Reader tests'
             cmd: 'python -m pytest -v ./tests/python_tests/test_gguf_reader.py'
             run_condition: ${{ fromJSON(needs.smart_ci.outputs.affected_components).GGUF.test || fromJSON(needs.smart_ci.outputs.affected_components).LLM.test }}
@@ -537,7 +536,6 @@ jobs:
             cmd: 'python -m pytest -v ./tools/who_what_benchmark/tests -m "not nanollava"'
             run_condition: ${{ fromJSON(needs.smart_ci.outputs.affected_components).WWB.test }}
             timeout: 120
-
           - name: 'EAGLE3 speculative decoding tests'
             cmd: |
               python -m pip install git+https://github.com/xufang-lisa/optimum-intel.git@ea9607daf32919024cdd4390deec9693a7b64d23
