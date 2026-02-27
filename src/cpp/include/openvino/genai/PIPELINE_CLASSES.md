@@ -1,8 +1,8 @@
-# Pipeline Classes Relationship Diagram
+# Pipeline & Model Classes Relationship Diagram
 
-All classes whose names contain "pipeline" (case-insensitive) under `src/cpp/include/openvino/genai`.
+All classes whose names contain "pipeline" or "model" (case-insensitive) under `src/cpp/include/openvino/genai`.
 
-## Class List
+## Pipeline Class List
 
 | # | Class | Header File |
 |---|-------|-------------|
@@ -149,3 +149,105 @@ classDiagram
 ### Inheritance
 
 No public pipeline classes inherit from one another. All impl base classes (`LLMPipelineImplBase`, `IContinuousBatchingPipeline`, `WhisperPipelineImplBase`, `VLMPipelineBase`, `DiffusionPipeline`) are forward-declared in the public headers and defined only in internal implementation files.
+
+---
+
+## Model Class List
+
+| # | Class | Header File |
+|---|-------|-------------|
+| 1 | `CLIPTextModel` | `image_generation/clip_text_model.hpp` |
+| 2 | `CLIPTextModelWithProjection` | `image_generation/clip_text_model_with_projection.hpp` |
+| 3 | `UNet2DConditionModel` | `image_generation/unet2d_condition_model.hpp` |
+| 4 | `T5EncoderModel` | `image_generation/t5_encoder_model.hpp` |
+| 5 | `FluxTransformer2DModel` | `image_generation/flux_transformer_2d_model.hpp` |
+| 6 | `SD3Transformer2DModel` | `image_generation/sd3_transformer_2d_model.hpp` |
+| 7 | `LTXVideoTransformer3DModel` | `video_generation/ltx_video_transformer_3d_model.hpp` |
+
+> `CLIPTextModelWithProjection` inherits from `CLIPTextModel`. All model classes hold a `std::shared_ptr<ov::Model>` member.
+
+## Model Relationship Diagram (Mermaid)
+
+```mermaid
+classDiagram
+    direction TB
+
+    %% ──────────────── CLIP ────────────────
+    class CLIPTextModel {
+        #shared_ptr~ov::Model~ m_model
+        -Config m_config
+        -AdapterController m_adapter_controller
+        -Tokenizer m_clip_tokenizer
+    }
+    class CLIPTextModelWithProjection {
+    }
+    CLIPTextModelWithProjection --|> CLIPTextModel : inherits
+
+    %% ──────────────── UNet ────────────────
+    class UNet2DConditionModel {
+        -shared_ptr~UNetInference~ m_impl
+        -shared_ptr~ov::Model~ m_model
+        -Config m_config
+    }
+    class UNetInference {
+        <<forward declared>>
+    }
+    UNet2DConditionModel *-- UNetInference : has-a
+
+    %% ──────────────── T5 Encoder ────────────────
+    class T5EncoderModel {
+        -shared_ptr~ov::Model~ m_model
+        -Tokenizer m_tokenizer
+    }
+
+    %% ──────────────── Flux Transformer ────────────────
+    class FluxTransformer2DModel {
+        -shared_ptr~ov::Model~ m_model
+        -Config m_config
+    }
+
+    %% ──────────────── SD3 Transformer ────────────────
+    class SD3Transformer2DModel {
+        -shared_ptr~Inference~ m_impl
+        -shared_ptr~ov::Model~ m_model
+        -Config m_config
+    }
+    class SD3Inference["SD3Transformer2DModel::Inference"] {
+        <<forward declared>>
+    }
+    SD3Transformer2DModel *-- SD3Inference : has-a
+
+    %% ──────────────── LTX Video Transformer ────────────────
+    class LTXVideoTransformer3DModel {
+        -shared_ptr~Inference~ m_impl
+        -shared_ptr~ov::Model~ m_model
+        -Config m_config
+    }
+    class LTXInference["LTXVideoTransformer3DModel::Inference"] {
+        <<forward declared>>
+    }
+    LTXVideoTransformer3DModel *-- LTXInference : has-a
+```
+
+## Model Relationship Summary
+
+### Inheritance
+
+| Derived Class | Base Class |
+|---|---|
+| `CLIPTextModelWithProjection` | `CLIPTextModel` |
+
+### Has-a (Composition)
+
+| Model Class | Impl Member | Smart Pointer |
+|---|---|---|
+| `CLIPTextModel` | `ov::Model` | `std::shared_ptr` |
+| `CLIPTextModelWithProjection` | *(inherited from CLIPTextModel)* | `std::shared_ptr` |
+| `UNet2DConditionModel` | `UNetInference` | `std::shared_ptr` |
+| `UNet2DConditionModel` | `ov::Model` | `std::shared_ptr` |
+| `T5EncoderModel` | `ov::Model` | `std::shared_ptr` |
+| `FluxTransformer2DModel` | `ov::Model` | `std::shared_ptr` |
+| `SD3Transformer2DModel` | `Inference` | `std::shared_ptr` |
+| `SD3Transformer2DModel` | `ov::Model` | `std::shared_ptr` |
+| `LTXVideoTransformer3DModel` | `Inference` | `std::shared_ptr` |
+| `LTXVideoTransformer3DModel` | `ov::Model` | `std::shared_ptr` |
