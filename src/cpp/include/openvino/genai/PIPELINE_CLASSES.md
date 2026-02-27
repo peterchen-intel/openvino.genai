@@ -1,4 +1,4 @@
-# Pipeline & Model Classes Relationship Diagram
+# Pipeline and Model Classes Relationship Diagram
 
 All classes whose names contain "pipeline" or "model" (case-insensitive) under `src/cpp/include/openvino/genai`.
 
@@ -242,7 +242,7 @@ classDiagram
 | Model Class | Impl Member | Smart Pointer |
 |---|---|---|
 | `CLIPTextModel` | `ov::Model` | `std::shared_ptr` |
-| `CLIPTextModelWithProjection` | *(inherited from CLIPTextModel)* | `std::shared_ptr` |
+| `CLIPTextModelWithProjection` | `ov::Model` *(inherited from CLIPTextModel)* | `std::shared_ptr` |
 | `UNet2DConditionModel` | `UNetInference` | `std::shared_ptr` |
 | `UNet2DConditionModel` | `ov::Model` | `std::shared_ptr` |
 | `T5EncoderModel` | `ov::Model` | `std::shared_ptr` |
