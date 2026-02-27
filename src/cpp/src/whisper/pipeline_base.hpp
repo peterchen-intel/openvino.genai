@@ -21,12 +21,14 @@ public:
 
     float m_load_time_ms = 0;
 
-    WhisperPipelineImplBase(const std::filesystem::path& models_path)
+    WhisperPipelineImplBase(const std::filesystem::path& models_path, const std::shared_ptr<ov::Core>& core)
         : m_generation_config(utils::from_config_json_if_exists<WhisperGenerationConfig>(models_path)),
-          m_core(utils::create_core()),
+          m_core(core),
           m_tokenizer{models_path, m_core},
           m_feature_extractor{models_path / "preprocessor_config.json"},
-          m_model_config{models_path / "config.json"} {}
+          m_model_config{models_path / "config.json"} {
+        OPENVINO_ASSERT(m_core, "WhisperPipeline requires a valid ov::Core");
+    }
 
     virtual WhisperDecodedResults generate(const RawSpeechInput& raw_speech_input,
                                            OptionalWhisperGenerationConfig generation_config,

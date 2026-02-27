@@ -88,11 +88,13 @@ public:
     TextEmbeddingPipelineImpl(const std::filesystem::path& models_path,
                               const std::string& device,
                               const Config& config,
+                              const std::shared_ptr<ov::Core>& core,
                               const ov::AnyMap& properties = {})
-        : m_core{create_text_embedding_core()},
+        : m_core{core},
           m_config{config},
           m_tokenizer{models_path, m_core},
           m_max_position_embeddings{read_max_position_embeddings(models_path)} {
+        OPENVINO_ASSERT(m_core, "TextEmbeddingPipeline requires a valid ov::Core");
         m_config.validate();
 
         auto model = m_core->read_model(models_path / "openvino_model.xml", {}, properties);
@@ -299,16 +301,18 @@ private:
 TextEmbeddingPipeline::TextEmbeddingPipeline(const std::filesystem::path& models_path,
                                              const std::string& device,
                                              const Config& config,
-                                             const ov::AnyMap& properties) {
-    m_impl = std::make_unique<TextEmbeddingPipelineImpl>(models_path, device, config, properties);
+                                             const ov::AnyMap& properties)
+    : m_core{create_text_embedding_core()} {
+    m_impl = std::make_unique<TextEmbeddingPipelineImpl>(models_path, device, config, m_core, properties);
 };
 
 TextEmbeddingPipeline::TextEmbeddingPipeline(const std::filesystem::path& models_path,
                                              const std::string& device,
-                                             const ov::AnyMap& properties) {
+                                             const ov::AnyMap& properties)
+    : m_core{create_text_embedding_core()} {
     const auto& plugin_properties = remove_config_properties(properties);
 
-    m_impl = std::make_unique<TextEmbeddingPipelineImpl>(models_path, device, Config(properties), plugin_properties);
+    m_impl = std::make_unique<TextEmbeddingPipelineImpl>(models_path, device, Config(properties), m_core, plugin_properties);
 };
 
 EmbeddingResults TextEmbeddingPipeline::embed_documents(const std::vector<std::string>& texts) {

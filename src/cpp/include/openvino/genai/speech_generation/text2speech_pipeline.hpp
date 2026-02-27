@@ -6,6 +6,7 @@
 #include "openvino/genai/generation_config.hpp"
 #include "openvino/genai/speech_generation/speech_generation_config.hpp"
 #include "openvino/genai/speech_generation/speech_generation_perf_metrics.hpp"
+#include "openvino/runtime/core.hpp"
 
 namespace ov {
 namespace genai {
@@ -85,6 +86,7 @@ public:
 
 private:
     std::shared_ptr<Text2SpeechPipelineImpl> m_impl;
+    std::shared_ptr<ov::Core> m_core;
     SpeechGenerationConfig m_speech_gen_config;
 };
 

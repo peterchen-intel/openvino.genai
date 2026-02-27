@@ -4,6 +4,7 @@
 #pragma once
 
 #include "openvino/genai/tokenizer.hpp"
+#include "openvino/runtime/core.hpp"
 
 namespace ov {
 namespace genai {
@@ -105,6 +106,7 @@ public:
 
 private:
     class TextRerankPipelineImpl;
+    std::shared_ptr<ov::Core> m_core;
     std::unique_ptr<TextRerankPipelineImpl> m_impl;
 };
 

@@ -72,8 +72,9 @@ class WhisperPipeline::WhisperPipelineStatefulImpl : public WhisperPipeline::Whi
 public:
     WhisperPipelineStatefulImpl(const std::filesystem::path& models_path,
                                 const std::string& device,
-                                const ov::AnyMap& properties)
-        : WhisperPipelineImplBase{models_path},
+                                const ov::AnyMap& properties,
+                                const std::shared_ptr<ov::Core>& core)
+        : WhisperPipelineImplBase{models_path, core},
           m_sampler(m_tokenizer) {
         ov::AnyMap properties_copy = properties;
         m_generation_config.update_generation_config(properties_copy);
@@ -185,18 +186,19 @@ std::pair<std::string, Any> generation_config(const WhisperGenerationConfig& con
 
 ov::genai::WhisperPipeline::WhisperPipeline(const std::filesystem::path& models_path,
                                             const std::string& device,
-                                            const ov::AnyMap& properties) {
+                                            const ov::AnyMap& properties)
+    : m_core(utils::create_core()) {
     auto start_time = std::chrono::steady_clock::now();
     if (device == "NPU") {
         auto properties_copy = properties;
         const bool use_static_pipeline = utils::pop_or_default(properties_copy, "STATIC_PIPELINE", false);
         if (!use_static_pipeline) {
-            m_impl = std::make_unique<WhisperPipelineStatefulImpl>(models_path, device, properties_copy);
+            m_impl = std::make_unique<WhisperPipelineStatefulImpl>(models_path, device, properties_copy, m_core);
         } else {
-            m_impl = std::make_unique<StaticWhisperPipeline>(models_path, properties_copy);
+            m_impl = std::make_unique<StaticWhisperPipeline>(models_path, properties_copy, m_core);
         }
     } else {
-        m_impl = std::make_unique<WhisperPipelineStatefulImpl>(models_path, device, properties);
+        m_impl = std::make_unique<WhisperPipelineStatefulImpl>(models_path, device, properties, m_core);
     }
     auto stop_time = std::chrono::steady_clock::now();
     m_impl->m_load_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count();

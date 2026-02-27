@@ -49,9 +49,7 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline( const std::filesystem::p
     m_core = utils::create_core();
     auto properties_without_draft_model = properties;
     auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
-    if (!draft_model_desr.core) {
-        draft_model_desr.core = m_core;
-    }
+    draft_model_desr.core = m_core;
     auto is_prompt_lookup_enabled = extract_prompt_lookup_from_config(properties_without_draft_model);
     auto eagle_rt_info = utils::eagle3::extract_eagle3_info_from_config(draft_model_desr.properties, models_path);
 
@@ -63,7 +61,7 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline( const std::filesystem::p
 
     std::shared_ptr<InputsEmbedder> embedder;
     if (std::filesystem::exists(models_path / "openvino_text_embeddings_model.xml")) {
-        embedder = std::make_shared<InputsEmbedder>(models_path, device, vision_encoder_properties);
+        embedder = std::make_shared<InputsEmbedder>(models_path, device, vision_encoder_properties, m_core);
     }
 
     utils::print_scheduler_config_info(scheduler_config);
@@ -118,9 +116,7 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
     m_core = utils::create_core();
     auto properties_without_draft_model = properties;
     auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
-    if (!draft_model_desr.core) {
-        draft_model_desr.core = m_core;
-    }
+    draft_model_desr.core = m_core;
     auto is_prompt_lookup_enabled = extract_prompt_lookup_from_config(properties_without_draft_model);
     auto eagle_rt_info = utils::eagle3::extract_eagle3_info_from_config(draft_model_desr.properties, models_path);
     auto model = utils::read_model(*m_core, models_path, properties_without_draft_model);
@@ -130,7 +126,7 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
     auto generation_config = utils::from_config_json_if_exists(models_path);
     std::shared_ptr<InputsEmbedder> embedder;
     if (std::filesystem::exists(models_path / "openvino_text_embeddings_model.xml")) {
-        embedder = std::make_shared<InputsEmbedder>(models_path, device, properties_without_draft_model_without_gguf);
+        embedder = std::make_shared<InputsEmbedder>(models_path, device, properties_without_draft_model_without_gguf, m_core);
     }
 
     utils::print_scheduler_config_info(scheduler_config);
@@ -190,9 +186,7 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
 
     auto properties_without_draft_model = properties;
     auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
-    if (!draft_model_desr.core) {
-        draft_model_desr.core = m_core;
-    }
+    draft_model_desr.core = m_core;
     auto is_prompt_lookup_enabled = extract_prompt_lookup_from_config(properties_without_draft_model);
     auto eagle_rt_info = utils::eagle3::extract_eagle3_info_from_config(draft_model_desr.properties, std::filesystem::path(model_str));
     auto model = m_core->read_model(model_str, weights_tensor);
@@ -204,7 +198,7 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
         std::string weights_path = rt_info.at("__weights_path").as<std::string>();
         directory = std::filesystem::path(weights_path).parent_path();
         if (std::filesystem::exists(directory / "openvino_text_embeddings_model.xml")) {
-            embedder = std::make_shared<InputsEmbedder>(directory, device, properties_without_draft_model);
+            embedder = std::make_shared<InputsEmbedder>(directory, device, properties_without_draft_model, m_core);
         }
     }
 
@@ -262,9 +256,7 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
 
     auto properties_without_draft_model = properties;
     auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
-    if (!draft_model_desr.core) {
-        draft_model_desr.core = m_core;
-    }
+    draft_model_desr.core = m_core;
     auto is_prompt_lookup_enabled = extract_prompt_lookup_from_config(properties_without_draft_model);
     auto model_pair = utils::get_model_weights_pair(models_map, "language");
     auto model = m_core->read_model(model_pair.first, model_pair.second);
@@ -274,13 +266,13 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
     std::shared_ptr<InputsEmbedder> embedder = nullptr;
     if (embedder_config_dir_path.has_value()) {
         auto path = *embedder_config_dir_path;
-        embedder = std::make_shared<InputsEmbedder>(models_map, tokenizer, path, device, properties);
+        embedder = std::make_shared<InputsEmbedder>(models_map, tokenizer, path, device, properties, m_core);
     }
     else if (rt_info.find("__weights_path") != rt_info.end()) {
         std::string weights_path = rt_info.at("__weights_path").as<std::string>();
         directory = std::filesystem::path(weights_path).parent_path();
         if (std::filesystem::exists(directory / "openvino_text_embeddings_model.xml")) {
-            embedder = std::make_shared<InputsEmbedder>(directory, device, properties_without_draft_model);
+            embedder = std::make_shared<InputsEmbedder>(directory, device, properties_without_draft_model, m_core);
         }
     }
 

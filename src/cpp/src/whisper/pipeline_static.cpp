@@ -1029,8 +1029,9 @@ namespace ov {
 namespace genai {
 
 WhisperPipeline::StaticWhisperPipeline::StaticWhisperPipeline(const std::filesystem::path& models_path,
-                                                              const ov::AnyMap& properties)
-    : WhisperPipelineImplBase{models_path}
+                                                              const ov::AnyMap& properties,
+                                                              const std::shared_ptr<ov::Core>& core)
+    : WhisperPipelineImplBase{models_path, core}
     , m_sampler(m_tokenizer) {
     ov::AnyMap properties_copy = properties;
     m_generation_config.update_generation_config(properties_copy);

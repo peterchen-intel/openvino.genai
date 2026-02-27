@@ -153,9 +153,11 @@ public:
     TextRerankPipelineImpl(const std::filesystem::path& models_path,
                            const std::string& device,
                            const Config& config,
+                           const std::shared_ptr<ov::Core>& core,
                            const ov::AnyMap& properties = {})
-        : m_core{create_text_rerank_core()},
+        : m_core{core},
           m_config{config} {
+        OPENVINO_ASSERT(m_core, "TextRerankPipeline requires a valid ov::Core");
         const auto model_type = read_model_type(models_path);
         const bool is_qwen3 = model_type.has_value() && model_type.value() == "qwen3";
 
@@ -292,14 +294,17 @@ TextRerankPipeline::TextRerankPipeline(const std::filesystem::path& models_path,
                                        const std::string& device,
                                        const Config& config,
                                        const ov::AnyMap& properties)
-    : m_impl{std::make_unique<TextRerankPipelineImpl>(models_path, device, config, properties)} {};
+    : m_core{create_text_rerank_core()},
+      m_impl{std::make_unique<TextRerankPipelineImpl>(models_path, device, config, m_core, properties)} {};
 
 TextRerankPipeline::TextRerankPipeline(const std::filesystem::path& models_path,
                                        const std::string& device,
                                        const ov::AnyMap& properties)
-    : m_impl{std::make_unique<TextRerankPipelineImpl>(models_path,
+    : m_core{create_text_rerank_core()},
+      m_impl{std::make_unique<TextRerankPipelineImpl>(models_path,
                                                       device,
                                                       Config(properties),
+                                                      m_core,
                                                       remove_config_properties(properties))} {};
 
 std::vector<std::pair<size_t, float>> TextRerankPipeline::rerank(const std::string& query,

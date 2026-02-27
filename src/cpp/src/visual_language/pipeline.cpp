@@ -90,14 +90,16 @@ public:
     VLMPipelineImpl(
         const std::filesystem::path& models_dir,
         const std::string& device,
-        const ov::AnyMap& properties
+        const ov::AnyMap& properties,
+        const std::shared_ptr<ov::Core>& core
     ) :
-        m_core(create_vlm_core()),
+        m_core(core),
         m_generation_config{
             utils::from_config_json_if_exists<GenerationConfig>(
                 models_dir, "generation_config.json"
             )
         } {
+        OPENVINO_ASSERT(m_core, "VLMPipeline requires a valid ov::Core");
         m_is_npu = device.find("NPU") != std::string::npos;
 
         auto properties_copy = properties;
@@ -167,10 +169,12 @@ public:
         const std::filesystem::path& config_dir_path,
         const std::string& device,
         const ov::AnyMap& properties,
-        const GenerationConfig& generation_config
+        const GenerationConfig& generation_config,
+        const std::shared_ptr<ov::Core>& core
     ) :
-        m_core(create_vlm_core()),
+        m_core(core),
         m_generation_config{generation_config} {
+        OPENVINO_ASSERT(m_core, "VLMPipeline requires a valid ov::Core");
         m_is_npu = device.find("NPU") != std::string::npos;
         OPENVINO_ASSERT(!m_is_npu,
             "VLMPipeline initialization from string isn't supported for NPU device");
@@ -637,14 +641,14 @@ VLMPipeline::VLMPipeline(
     const std::filesystem::path& models_dir,
     const std::string& device,
     const ov::AnyMap& user_properties
-) {
+) : m_core(create_vlm_core()) {
     auto start_time = std::chrono::steady_clock::now();
 
     auto [properties, attention_backend] = utils::extract_attention_backend(user_properties);
     if (device == "NPU") {
         auto it = properties.find("scheduler_config");
         OPENVINO_ASSERT(it == properties.end(), "scheduler_config should be removed for VLMPipeline initialization");
-        m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, device, properties);
+        m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, device, properties, m_core);
     } else {
         // If CB is invoked explicitly, create CB adapter as is and re-throw in case if internal issues
         if (utils::explicitly_requires_paged_attention(user_properties)) {
@@ -665,7 +669,7 @@ VLMPipeline::VLMPipeline(
         }
 
         if (m_pimpl == nullptr) {
-            m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, device, properties);
+            m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, device, properties, m_core);
         }
     }
 
@@ -680,14 +684,14 @@ VLMPipeline::VLMPipeline(
     const std::string& device,
     const ov::AnyMap& user_properties,
     const GenerationConfig& generation_config
-) {
+) : m_core(create_vlm_core()) {
     auto start_time = std::chrono::steady_clock::now();
 
     auto [properties, attention_backend] = utils::extract_attention_backend(user_properties);
     if (device == "NPU") {
         auto it = properties.find("scheduler_config");
         OPENVINO_ASSERT(it == properties.end(), "scheduler_config should be removed for VLMPipeline initialization");
-        m_pimpl = std::make_unique<VLMPipelineImpl>(models_map, tokenizer, config_dir_path, device, properties, generation_config);
+        m_pimpl = std::make_unique<VLMPipelineImpl>(models_map, tokenizer, config_dir_path, device, properties, generation_config, m_core);
     } else {
         // If CB is invoked explicitly, create CB adapter as is and re-throw in case if internal issues
         if (utils::explicitly_requires_paged_attention(user_properties)) {
@@ -708,7 +712,7 @@ VLMPipeline::VLMPipeline(
         }
 
         if (m_pimpl == nullptr) {
-            m_pimpl = std::make_unique<VLMPipelineImpl>(models_map, tokenizer, config_dir_path, device, properties, generation_config);
+            m_pimpl = std::make_unique<VLMPipelineImpl>(models_map, tokenizer, config_dir_path, device, properties, generation_config, m_core);
         }
 
     }
