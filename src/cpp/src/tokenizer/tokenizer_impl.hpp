@@ -23,8 +23,8 @@
 namespace ov {
 namespace genai {
 void check_arguments(const ov::AnyMap& parameters, std::set<std::string> allowed_argnames);
-ov::Core core_with_extension();
-ov::Core get_core_singleton();
+std::shared_ptr<ov::Core> core_with_extension();
+std::shared_ptr<ov::Core> get_core_singleton();
 
 class StructuredOutputController;
 class Tokenizer::TokenizerImpl {
@@ -33,6 +33,8 @@ public:
     std::unique_ptr<CircularBufferQueue<ov::InferRequest>> m_ireq_queue_detokenizer;
     std::unordered_map<ov::InferRequest*, ov::AnyMap> m_request_to_state_flags;
     std::shared_ptr<void> m_shared_object_ov_tokenizers = nullptr;
+    std::shared_ptr<ov::Core> m_core = nullptr;
+    bool m_uses_core_singleton = false;
     bool is_paired_input = false;
     bool m_older_than_24_5 = false;
     int64_t m_pad_token_id = -1;
@@ -52,7 +54,9 @@ public:
     void set_state_if_necessary(CircularBufferQueueElementGuard<ov::InferRequest>& infer_request_guard, const ov::AnyMap& params);
 
     TokenizerImpl(const std::filesystem::path& models_path, const ov::AnyMap& properties);
+    TokenizerImpl(const std::filesystem::path& models_path, const ov::AnyMap& properties, const std::shared_ptr<ov::Core>& core);
     TokenizerImpl(const std::pair<std::shared_ptr<ov::Model>, std::shared_ptr<ov::Model>>& models, const ov::AnyMap& properties);
+    TokenizerImpl(const std::pair<std::shared_ptr<ov::Model>, std::shared_ptr<ov::Model>>& models, const ov::AnyMap& properties, const std::shared_ptr<ov::Core>& core);
 
     void setup_tokenizer(const std::filesystem::path& models_path, const ov::AnyMap& properties);
     void setup_tokenizer(const std::pair<std::shared_ptr<ov::Model>, std::shared_ptr<ov::Model>>& models, ov::AnyMap properties);

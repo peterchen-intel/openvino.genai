@@ -11,6 +11,7 @@
 #include "openvino/core/any.hpp"
 #include "openvino/genai/llm_pipeline.hpp"
 #include "openvino/genai/whisper_generation_config.hpp"
+#include "openvino/runtime/core.hpp"
 
 namespace ov {
 namespace genai {
@@ -103,6 +104,7 @@ struct WhisperDecodedResults {
  */
 class OPENVINO_GENAI_EXPORTS WhisperPipeline {
     class WhisperPipelineImplBase;
+    std::shared_ptr<ov::Core> m_core;
     std::unique_ptr<WhisperPipelineImplBase> m_impl;
 
     class StaticWhisperPipeline;

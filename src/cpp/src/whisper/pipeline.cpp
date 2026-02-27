@@ -72,22 +72,22 @@ class WhisperPipeline::WhisperPipelineStatefulImpl : public WhisperPipeline::Whi
 public:
     WhisperPipelineStatefulImpl(const std::filesystem::path& models_path,
                                 const std::string& device,
-                                const ov::AnyMap& properties)
-        : WhisperPipelineImplBase{models_path},
+                                const ov::AnyMap& properties,
+                                const std::shared_ptr<ov::Core>& core)
+        : WhisperPipelineImplBase{models_path, core},
           m_sampler(m_tokenizer) {
         ov::AnyMap properties_copy = properties;
         m_generation_config.update_generation_config(properties_copy);
         erase_whisper_generation_config_keys(properties_copy);
 
-        ov::Core core = utils::singleton_core();
         ov::CompiledModel compiled_model;
         if (device == "NPU") {
-            auto encoder_model = core.read_model(models_path / "openvino_encoder_model.xml", {}, properties_copy);
+            auto encoder_model = m_core->read_model(models_path / "openvino_encoder_model.xml", {}, properties_copy);
             // NB: only batch_size == 1 is supported now for NPU
             reshape_to_static_encoder(encoder_model, 1, m_feature_extractor.feature_size);
-            compiled_model = core.compile_model(encoder_model, "NPU", properties_copy);
+            compiled_model = m_core->compile_model(encoder_model, "NPU", properties_copy);
         } else {
-            compiled_model = core.compile_model(models_path / "openvino_encoder_model.xml", device, properties_copy);
+            compiled_model = m_core->compile_model(models_path / "openvino_encoder_model.xml", device, properties_copy);
         }
 
         ov::genai::utils::print_compiled_model_properties(compiled_model, "whisper encoder model");
@@ -99,7 +99,8 @@ public:
                                       device,
                                       properties_copy,
                                       m_encoder.get_compiled_model().output("last_hidden_state").get_partial_shape(),
-                                      decompose_cross_attention_spda_ops);
+                                      decompose_cross_attention_spda_ops,
+                                      m_core);
 
         // If eos_token_id was not provided, take value
         if (m_generation_config.eos_token_id == -1) {
@@ -185,18 +186,19 @@ std::pair<std::string, Any> generation_config(const WhisperGenerationConfig& con
 
 ov::genai::WhisperPipeline::WhisperPipeline(const std::filesystem::path& models_path,
                                             const std::string& device,
-                                            const ov::AnyMap& properties) {
+                                            const ov::AnyMap& properties)
+    : m_core(utils::create_core()) {
     auto start_time = std::chrono::steady_clock::now();
     if (device == "NPU") {
         auto properties_copy = properties;
         const bool use_static_pipeline = utils::pop_or_default(properties_copy, "STATIC_PIPELINE", false);
         if (!use_static_pipeline) {
-            m_impl = std::make_unique<WhisperPipelineStatefulImpl>(models_path, device, properties_copy);
+            m_impl = std::make_unique<WhisperPipelineStatefulImpl>(models_path, device, properties_copy, m_core);
         } else {
-            m_impl = std::make_unique<StaticWhisperPipeline>(models_path, properties_copy);
+            m_impl = std::make_unique<StaticWhisperPipeline>(models_path, properties_copy, m_core);
         }
     } else {
-        m_impl = std::make_unique<WhisperPipelineStatefulImpl>(models_path, device, properties);
+        m_impl = std::make_unique<WhisperPipelineStatefulImpl>(models_path, device, properties, m_core);
     }
     auto stop_time = std::chrono::steady_clock::now();
     m_impl->m_load_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count();

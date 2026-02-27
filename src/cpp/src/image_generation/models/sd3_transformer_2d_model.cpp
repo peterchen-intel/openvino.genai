@@ -14,6 +14,14 @@
 namespace ov {
 namespace genai {
 
+namespace {
+
+std::shared_ptr<ov::Core> resolve_core(const std::shared_ptr<ov::Core>& core) {
+    return core ? core : std::make_shared<ov::Core>();
+}
+
+} // namespace
+
 size_t get_vae_scale_factor(const std::filesystem::path& vae_config_path);
 
 SD3Transformer2DModel::Config::Config(const std::filesystem::path& config_path) {
@@ -29,34 +37,41 @@ SD3Transformer2DModel::Config::Config(const std::filesystem::path& config_path) 
     read_json_param(data, "joint_attention_dim", joint_attention_dim);
 }
 
-SD3Transformer2DModel::SD3Transformer2DModel(const std::filesystem::path& root_dir)
-    : m_config(root_dir / "config.json") {
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+SD3Transformer2DModel::SD3Transformer2DModel(const std::filesystem::path& root_dir,
+                                             const std::shared_ptr<ov::Core>& core)
+    : m_config(root_dir / "config.json"),
+      m_core(resolve_core(core)) {
+    m_model = m_core->read_model(root_dir / "openvino_model.xml");
     m_vae_scale_factor = get_vae_scale_factor(root_dir.parent_path() / "vae_decoder" / "config.json");
 }
 
 SD3Transformer2DModel::SD3Transformer2DModel(const std::filesystem::path& root_dir,
-                                             const std::string& device,
-                                             const ov::AnyMap& properties)
-    : SD3Transformer2DModel(root_dir) {
+                                              const std::string& device,
+                                              const ov::AnyMap& properties,
+                                              const std::shared_ptr<ov::Core>& core)
+    : SD3Transformer2DModel(root_dir, core) {
     compile(device, properties);
 }
 
 SD3Transformer2DModel::SD3Transformer2DModel(const std::string& model,
-                                             const Tensor& weights,
-                                             const Config& config,
-                                             const size_t vae_scale_factor) :
-    m_config(config), m_vae_scale_factor(vae_scale_factor) {
-    m_model = utils::singleton_core().read_model(model, weights);
+                                              const Tensor& weights,
+                                              const Config& config,
+                                              const size_t vae_scale_factor,
+                                              const std::shared_ptr<ov::Core>& core)
+    : m_config(config),
+      m_core(resolve_core(core)),
+      m_vae_scale_factor(vae_scale_factor) {
+    m_model = m_core->read_model(model, weights);
 }
 
 SD3Transformer2DModel::SD3Transformer2DModel(const std::string& model,
-                                             const Tensor& weights,
-                                             const Config& config,
-                                             const size_t vae_scale_factor,
-                                             const std::string& device,
-                                             const ov::AnyMap& properties) :
-    SD3Transformer2DModel(model, weights, config, vae_scale_factor) {
+                                              const Tensor& weights,
+                                              const Config& config,
+                                              const size_t vae_scale_factor,
+                                              const std::string& device,
+                                              const ov::AnyMap& properties,
+                                              const std::shared_ptr<ov::Core>& core)
+    : SD3Transformer2DModel(model, weights, config, vae_scale_factor, core) {
     compile(device, properties);
 }
 
@@ -115,7 +130,7 @@ SD3Transformer2DModel& SD3Transformer2DModel::compile(const std::string& device,
         m_impl = std::make_shared<SD3Transformer2DModel::InferenceDynamic>();
     }
 
-    m_impl->compile(m_model, device, *filtered_properties);
+    m_impl->compile(m_model, m_core, device, *filtered_properties);
 
     // release the original model
     m_model.reset();

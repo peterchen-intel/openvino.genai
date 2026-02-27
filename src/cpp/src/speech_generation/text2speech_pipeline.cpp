@@ -15,6 +15,10 @@
 
 namespace {
 
+std::shared_ptr<ov::Core> create_text2speech_core() {
+    return ov::genai::utils::create_core();
+}
+
 const std::string get_class_name(const std::filesystem::path& root_dir) {
     const std::filesystem::path model_index_path = root_dir / "config.json";
     std::ifstream file(model_index_path);
@@ -40,14 +44,15 @@ namespace genai {
 Text2SpeechPipeline::Text2SpeechPipeline(const std::filesystem::path& root_dir,
                                          const std::string& device,
                                          const ov::AnyMap& properties)
-    : m_speech_gen_config(utils::from_config_json_if_exists<SpeechGenerationConfig>(root_dir)) {
+    : m_core(create_text2speech_core()),
+      m_speech_gen_config(utils::from_config_json_if_exists<SpeechGenerationConfig>(root_dir)) {
     const std::string class_name = get_class_name(root_dir);
 
     auto start_time = std::chrono::steady_clock::now();
 
-    auto tokenizer = ov::genai::Tokenizer(root_dir);
+    auto tokenizer = ov::genai::Tokenizer(root_dir, m_core);
     if (class_name == "SpeechT5ForTextToSpeech") {
-        m_impl = std::make_shared<SpeechT5TTSImpl>(root_dir, device, properties, tokenizer);
+        m_impl = std::make_shared<SpeechT5TTSImpl>(root_dir, device, properties, tokenizer, m_core);
     } else {
         OPENVINO_THROW("Unsupported text to speech generation pipeline '", class_name, "'");
     }

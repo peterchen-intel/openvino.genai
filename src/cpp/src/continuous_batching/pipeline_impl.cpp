@@ -70,7 +70,9 @@ ContinuousBatchingPipeline::ContinuousBatchingImpl::ContinuousBatchingImpl(
     const std::string& device,
     const ov::AnyMap& properties,
     const ov::genai::GenerationConfig& generation_config,
-    bool is_validation_mode_enabled) {
+    const std::shared_ptr<ov::Core>& core,
+    bool is_validation_mode_enabled)
+    : IContinuousBatchingPipeline(core) {
     m_tokenizer = tokenizer;
     m_generation_config = generation_config;
     m_is_validation_mode_enabled = is_validation_mode_enabled;
@@ -94,7 +96,8 @@ ContinuousBatchingPipeline::ContinuousBatchingImpl::ContinuousBatchingImpl(
     const std::string& device,
     const ov::AnyMap& properties,
     const ov::genai::GenerationConfig& generation_config,
-    bool is_validation_mode_enabled) : ContinuousBatchingImpl(model, tokenizer, scheduler_config, device, properties, generation_config, is_validation_mode_enabled){
+    const std::shared_ptr<ov::Core>& core,
+    bool is_validation_mode_enabled) : ContinuousBatchingImpl(model, tokenizer, scheduler_config, device, properties, generation_config, core, is_validation_mode_enabled){
     m_inputs_embedder = inputs_embedder;
     // Note: set_inputs_embedder also sets the embedding model internally.
     m_model_runner->set_inputs_embedder(inputs_embedder);
@@ -140,7 +143,7 @@ void ContinuousBatchingPipeline::ContinuousBatchingImpl::initialize_pipeline(
         filtered_properties.fork().erase("sampler_num_threads");   // do not use iterator sampler_num_threads_it because a forked container may not be the same container
     }
 
-    ov::CompiledModel compiled_model = utils::singleton_core().compile_model(model, device, *filtered_properties);
+    ov::CompiledModel compiled_model = m_core->compile_model(model, device, *filtered_properties);
     std::vector<std::string> execution_devices = compiled_model.get_property(ov::execution_devices);
     const bool all_gpu_device =
         std::all_of(execution_devices.begin(), execution_devices.end(), [&](const std::string& device) {

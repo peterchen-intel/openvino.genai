@@ -20,7 +20,8 @@ public:
                                                  const SchedulerConfig& scheduler_config,
                                                  const std::string& device,
                                                  const ov::AnyMap& plugin_config,
-                                                 bool is_validation_mode_enabled);
+                                                 bool is_validation_mode_enabled,
+                                                 const std::shared_ptr<ov::Core>& core = nullptr);
 
     void multistep();
 
@@ -53,14 +54,16 @@ public:
                                             const SchedulerConfig& scheduler_config,
                                             const std::string& device,
                                             const ov::AnyMap& plugin_config,
-                                            bool is_validation_mode_enabled)
+                                            bool is_validation_mode_enabled,
+                                            const std::shared_ptr<ov::Core>& core = nullptr)
         : ContinuousBatchingForSpeculativeDecodingImpl(model,
                                                        tokenizer,
                                                        generation_config,
                                                        scheduler_config,
                                                        device,
                                                        plugin_config,
-                                                       is_validation_mode_enabled) {
+                                                       is_validation_mode_enabled,
+                                                       core) {
         eagle_mode_enabled = true;
     };
 

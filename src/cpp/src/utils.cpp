@@ -17,6 +17,7 @@
 #include "openvino/op/transpose.hpp"
 #include "openvino/genai/text_streamer.hpp"
 #include "gguf_utils/gguf_modeling.hpp"
+#include "tokenizer/tokenizers_path.hpp"
 
 
 #include "sampling/sampler.hpp"
@@ -364,6 +365,15 @@ ov::Core& singleton_core() {
     return core;
 }
 
+std::shared_ptr<ov::Core> create_core() {
+    auto core = std::make_shared<ov::Core>();
+    const auto tokenizers_path = tokenizers_relative_to_genai();
+    if (std::filesystem::exists(tokenizers_path)) {
+        core->add_extension(tokenizers_path);
+    }
+    return core;
+}
+
 
 namespace {
 bool is_gguf_model(const std::filesystem::path& file_path) {
@@ -400,7 +410,7 @@ void save_openvino_model(const std::shared_ptr<ov::Model>& model, const std::str
     }
 }
 
-std::shared_ptr<ov::Model> read_model(const std::filesystem::path& model_dir,  const ov::AnyMap& properties) {
+std::shared_ptr<ov::Model> read_model(ov::Core& core, const std::filesystem::path& model_dir, const ov::AnyMap& properties) {
     auto [filtered_properties, enable_save_ov_model] = extract_gguf_properties(properties);
     if (is_gguf_model(model_dir)) {
 #ifdef ENABLE_GGUF
@@ -419,8 +429,12 @@ std::shared_ptr<ov::Model> read_model(const std::filesystem::path& model_dir,  c
             OPENVINO_THROW("Could not find a model in the directory '", model_dir, "'");
         }
 
-        return singleton_core().read_model(model_path, {}, filtered_properties);
+        return core.read_model(model_path, {}, filtered_properties);
     }
+}
+
+std::shared_ptr<ov::Model> read_model(const std::filesystem::path& model_dir,  const ov::AnyMap& properties) {
+    return read_model(singleton_core(), model_dir, properties);
 }
 
 size_t get_first_history_difference(const ov::Tensor& encoded_history, const std::vector<int64_t> tokenized_history) {
@@ -585,7 +599,8 @@ void print_scheduler_config_info(const SchedulerConfig &scheduler_config) {
     std::cout << scheduler_config.to_string() << std::endl;
 }
 
-void import_npu_model(ov::CompiledModel& compiled,
+void import_npu_model(ov::Core& core,
+                      ov::CompiledModel& compiled,
                       KVDesc& kv_desc,
                       const ov::AnyMap& config,
                       const std::string& blob_path) {
@@ -596,7 +611,7 @@ void import_npu_model(ov::CompiledModel& compiled,
     if (!fin.is_open()) {
         OPENVINO_THROW("Blob file can't be opened: " + blob_path);
     }
-    compiled = ov::genai::utils::singleton_core().import_model(fin, "NPU", config);
+    compiled = core.import_model(fin, "NPU", config);
     kv_desc.max_prompt_len = compiled.get_property("NPUW_LLM_MAX_PROMPT_LEN").as<uint32_t>();
     kv_desc.min_response_len = compiled.get_property("NPUW_LLM_MIN_RESPONSE_LEN").as<uint32_t>();
 }
@@ -650,6 +665,7 @@ std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_impl(const std::sha
                                                                   const ov::AnyMap& config,
                                                                   const KVAxesPosition& kv_pos,
                                                                   ModelType model_type,
+                                                                  ov::Core& core,
                                                                   const TextEmbeddingPipeline::Config& text_embed_config = {}) {
     ov::CompiledModel compiled;
     ov::AnyMap properties = config;
@@ -660,7 +676,7 @@ std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_impl(const std::sha
     const bool do_import = (!blob_path.empty() && !export_blob);
 
     if (do_import) {
-        import_npu_model(compiled, kv_desc, properties, blob_path);
+        import_npu_model(core, compiled, kv_desc, properties, blob_path);
     } else {
         switch (model_type) {
         case ModelType::TextEmbedding:
@@ -675,7 +691,7 @@ std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_impl(const std::sha
             break;
         }
 
-        compiled = ov::genai::utils::singleton_core().compile_model(model, "NPU", properties);
+        compiled = core.compile_model(model, "NPU", properties);
         // Also export compiled model if required
         if (export_blob) {
             if (blob_path.empty()) {
@@ -689,17 +705,38 @@ std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_impl(const std::sha
 }
 
 std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu(const std::shared_ptr<ov::Model>& model,
-                                                             const ov::AnyMap& config,
-                                                             const KVAxesPosition& kv_pos,
-                                                             const bool is_whisper) {
-    return compile_decoder_for_npu_impl(model, config, kv_pos, is_whisper ? ModelType::Whisper : ModelType::Default);
+                                                              const ov::AnyMap& config,
+                                                              const KVAxesPosition& kv_pos,
+                                                              const bool is_whisper,
+                                                              const std::shared_ptr<ov::Core>& core) {
+    ov::Core& resolved_core = core ? *core : ov::genai::utils::singleton_core();
+    return compile_decoder_for_npu_impl(model,
+                                        config,
+                                        kv_pos,
+                                        is_whisper ? ModelType::Whisper : ModelType::Default,
+                                        resolved_core);
 }
 
 std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_text_embedding(const std::shared_ptr<ov::Model>& model,
-                                                                            const ov::AnyMap& config,
-                                                                            const KVAxesPosition& kv_pos,
-                                                                            const TextEmbeddingPipeline::Config& text_embed_config) {
-    return compile_decoder_for_npu_impl(model, config, kv_pos, ModelType::TextEmbedding, text_embed_config);
+                                                                             const ov::AnyMap& config,
+                                                                             const KVAxesPosition& kv_pos,
+                                                                             const TextEmbeddingPipeline::Config& text_embed_config,
+                                                                             const std::shared_ptr<ov::Core>& core) {
+    ov::Core& resolved_core = core ? *core : ov::genai::utils::singleton_core();
+    return compile_decoder_for_npu_impl(model,
+                                        config,
+                                        kv_pos,
+                                        ModelType::TextEmbedding,
+                                        resolved_core,
+                                        text_embed_config);
+}
+
+std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_text_embedding(const std::shared_ptr<ov::Model>& model,
+                                                                             const ov::AnyMap& config,
+                                                                             const KVAxesPosition& kv_pos,
+                                                                             const TextEmbeddingPipeline::Config& text_embed_config,
+                                                                             ov::Core& core) {
+    return compile_decoder_for_npu_impl(model, config, kv_pos, ModelType::TextEmbedding, core, text_embed_config);
 }
 
 std::optional<ov::Any> pop_option(ov::AnyMap& config, const std::string& option_name) {
@@ -791,13 +828,17 @@ std::pair<ov::AnyMap, std::string> extract_attention_backend(const ov::AnyMap& e
     return {properties, attention_backend};
 };
 
-void release_core_plugin(const std::string& device) {
+void release_core_plugin(ov::Core& core, const std::string& device) {
     try {
-        singleton_core().unload_plugin(device);
+        core.unload_plugin(device);
     } catch (const ov::Exception&) {
         // Note: in a theory it can throw an exception when 2 different pipelines are created from
         // different threads and then both of them unload plugin for 'device' from ov::Core
     }
+}
+
+void release_core_plugin(const std::string& device) {
+    release_core_plugin(singleton_core(), device);
 }
 
 ov::Tensor merge_text_and_image_embeddings_llava(const ov::Tensor& input_ids, ov::Tensor& text_embeds, const std::vector<ov::Tensor>& image_embeds, int64_t image_token_id) {
@@ -896,10 +937,12 @@ std::pair<ov::AnyMap, std::optional<std::filesystem::path>> extract_export_prope
 
 ov::CompiledModel import_model(const std::filesystem::path& blob_path,
                                const std::string& device,
-                               const ov::AnyMap& properties) {
+                               const ov::AnyMap& properties,
+                               const std::shared_ptr<ov::Core>& core) {
     OPENVINO_ASSERT(!blob_path.empty(), "blob path is empty");
     ov::Tensor blob_tensor = ov::read_tensor_data(blob_path);
-    return ov::genai::utils::singleton_core().import_model(blob_tensor, device, properties);
+    auto& resolved_core = core ? *core : ov::genai::utils::singleton_core();
+    return resolved_core.import_model(blob_tensor, device, properties);
 }
 
 void export_model(ov::CompiledModel& compiled_model, const std::filesystem::path& blob_path) {

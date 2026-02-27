@@ -25,10 +25,18 @@ public:
                      const SchedulerConfig& scheduler_config,
                      const std::string& device,
                      const ov::AnyMap& properties,
-                     const ov::genai::GenerationConfig& generation_config) {
+                     const ov::genai::GenerationConfig& generation_config,
+                     const std::shared_ptr<ov::Core>& core = nullptr)
+        : IContinuousBatchingPipeline(core) {
         m_tokenizer = tokenizer;
         m_perf_metrics.raw_metrics.m_inference_durations = {{ MicroSeconds(0.0f) }};
-        m_pipeline = std::make_shared<ContinuousBatchingForPromptLookupImpl>(model, tokenizer, scheduler_config, device, properties, generation_config);
+        m_pipeline = std::make_shared<ContinuousBatchingForPromptLookupImpl>(model,
+                                                                             tokenizer,
+                                                                             scheduler_config,
+                                                                             device,
+                                                                             properties,
+                                                                             generation_config,
+                                                                             m_core);
     };
 
     GenerationHandle add_request(uint64_t request_id,

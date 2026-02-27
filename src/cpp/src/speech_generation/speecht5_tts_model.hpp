@@ -19,7 +19,8 @@ public:
     SpeechT5TTSImpl(const std::filesystem::path& models_path,
                     const std::string& device,
                     const ov::AnyMap& properties,
-                    const Tokenizer& tokenizer);
+                    const Tokenizer& tokenizer,
+                    const std::shared_ptr<ov::Core>& core);
 
     Text2SpeechDecodedResults generate(const std::vector<std::string>& texts,
                                        const ov::Tensor& speaker_embedding,
@@ -31,6 +32,7 @@ private:
     void init_model_config_params(const std::filesystem::path& root_dir);
 
 private:
+    std::shared_ptr<ov::Core> m_core;
     ov::InferRequest m_encoder;
     std::shared_ptr<SpeechT5TTSDecoder> m_decoder;
     ov::InferRequest m_postnet;

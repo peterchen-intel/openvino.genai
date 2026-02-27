@@ -14,6 +14,14 @@
 namespace ov {
 namespace genai {
 
+namespace {
+
+std::shared_ptr<ov::Core> resolve_core(const std::shared_ptr<ov::Core>& core) {
+    return core ? core : std::make_shared<ov::Core>();
+}
+
+} // namespace
+
 std::filesystem::path get_tokenizer_path_by_text_encoder(const std::filesystem::path& text_encoder_path) {
     const std::string to_replace = "text_encoder", replacement = "tokenizer";
     std::string text_encoder_path_str = text_encoder_path.string();
@@ -36,17 +44,21 @@ CLIPTextModel::Config::Config(const std::filesystem::path& config_path) {
     read_json_param(data, "num_hidden_layers", num_hidden_layers);
 }
 
-CLIPTextModel::CLIPTextModel(const std::filesystem::path& root_dir) :
-    m_clip_tokenizer(get_tokenizer_path_by_text_encoder(root_dir)),
-    m_config(root_dir / "config.json") {
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+CLIPTextModel::CLIPTextModel(const std::filesystem::path& root_dir,
+                             const std::shared_ptr<ov::Core>& core)
+    : m_config(root_dir / "config.json"),
+      m_core(resolve_core(core)),
+      m_clip_tokenizer(get_tokenizer_path_by_text_encoder(root_dir), m_core) {
+    m_model = m_core->read_model(root_dir / "openvino_model.xml");
 }
 
 CLIPTextModel::CLIPTextModel(const std::filesystem::path& root_dir,
                              const std::string& device,
-                             const ov::AnyMap& properties)
-    : m_clip_tokenizer(get_tokenizer_path_by_text_encoder(root_dir)),
-      m_config(root_dir / "config.json") {
+                             const ov::AnyMap& properties,
+                             const std::shared_ptr<ov::Core>& core)
+    : m_config(root_dir / "config.json"),
+      m_core(resolve_core(core)),
+      m_clip_tokenizer(get_tokenizer_path_by_text_encoder(root_dir), m_core) {
     const auto [properties_without_blob, blob_path] = utils::extract_export_properties(properties);
 
     if (blob_path.has_value()) {
@@ -54,16 +66,19 @@ CLIPTextModel::CLIPTextModel(const std::filesystem::path& root_dir,
         return;
     }
 
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+    m_model = m_core->read_model(root_dir / "openvino_model.xml");
     compile(device, properties);
 }
 
 CLIPTextModel::CLIPTextModel(const std::string& model,
                              const Tensor& weights,
                              const Config& config,
-                             const Tokenizer& clip_tokenizer) :
-    m_clip_tokenizer(clip_tokenizer), m_config(config) {
-    m_model = utils::singleton_core().read_model(model, weights);
+                             const Tokenizer& clip_tokenizer,
+                             const std::shared_ptr<ov::Core>& core)
+    : m_config(config),
+      m_core(resolve_core(core)),
+      m_clip_tokenizer(clip_tokenizer) {
+    m_model = m_core->read_model(model, weights);
 }
 
 CLIPTextModel::CLIPTextModel(const std::string& model,
@@ -71,8 +86,9 @@ CLIPTextModel::CLIPTextModel(const std::string& model,
                              const Config& config,
                              const Tokenizer& clip_tokenizer,
                              const std::string& device,
-                             const ov::AnyMap& properties) :
-    CLIPTextModel(model, weights, config, clip_tokenizer) {
+                             const ov::AnyMap& properties,
+                             const std::shared_ptr<ov::Core>& core)
+    : CLIPTextModel(model, weights, config, clip_tokenizer, core) {
     compile(device, properties);
 }
 
@@ -116,7 +132,7 @@ CLIPTextModel& CLIPTextModel::compile(const std::string& device, const ov::AnyMa
         adapters->set_tensor_name_prefix(adapters->get_tensor_name_prefix().value_or("lora_te"));
         m_adapter_controller = AdapterController(m_model, *adapters, device);
     }
-    ov::CompiledModel compiled_model = utils::singleton_core().compile_model(m_model, device, *filtered_properties);
+    ov::CompiledModel compiled_model = m_core->compile_model(m_model, device, *filtered_properties);
     ov::genai::utils::print_compiled_model_properties(compiled_model, "Clip Text model");
     m_request = compiled_model.create_infer_request();
     // release the original model

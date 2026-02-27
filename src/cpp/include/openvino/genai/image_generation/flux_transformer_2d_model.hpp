@@ -7,6 +7,7 @@
 #include <string>
 
 #include "openvino/core/any.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/runtime/infer_request.hpp"
 #include "openvino/runtime/properties.hpp"
 #include "openvino/runtime/tensor.hpp"
@@ -27,23 +28,27 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
-    explicit FluxTransformer2DModel(const std::filesystem::path& root_dir);
+    explicit FluxTransformer2DModel(const std::filesystem::path& root_dir,
+                                    const std::shared_ptr<ov::Core>& core = {});
 
     FluxTransformer2DModel(const std::filesystem::path& root_dir,
                            const std::string& device,
-                           const ov::AnyMap& properties = {});
+                           const ov::AnyMap& properties = {},
+                           const std::shared_ptr<ov::Core>& core = {});
 
     FluxTransformer2DModel(const std::string& model,
                            const Tensor& weights,
                            const Config& config,
-                           const size_t vae_scale_factor);
+                           const size_t vae_scale_factor,
+                           const std::shared_ptr<ov::Core>& core = {});
 
     FluxTransformer2DModel(const std::string& model,
                            const Tensor& weights,
                            const Config& config,
                            const size_t vae_scale_factor,
                            const std::string& device,
-                           const ov::AnyMap& properties = {});
+                           const ov::AnyMap& properties = {},
+                           const std::shared_ptr<ov::Core>& core = {});
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
@@ -85,6 +90,7 @@ public:
 private:
     Config m_config;
     AdapterController m_adapter_controller;
+    std::shared_ptr<ov::Core> m_core;
     ov::InferRequest m_request;
     std::shared_ptr<ov::Model> m_model;
     size_t m_vae_scale_factor;

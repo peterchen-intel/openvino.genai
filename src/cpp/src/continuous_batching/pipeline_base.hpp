@@ -26,7 +26,9 @@ enum class ModelInputType {
  */
 class ContinuousBatchingPipeline::IContinuousBatchingPipeline {
 protected:
+    IContinuousBatchingPipeline(const std::shared_ptr<ov::Core>& core = nullptr);
     Tokenizer m_tokenizer;
+    std::shared_ptr<ov::Core> m_core;
 
     // TODO (mzegla): GenerationConfig is request specific object
     // and pipeline only uses default rng_seed and some special tokens.

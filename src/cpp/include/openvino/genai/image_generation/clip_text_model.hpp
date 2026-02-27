@@ -12,6 +12,7 @@
 #include "openvino/genai/lora_adapter.hpp"
 
 #include "openvino/core/any.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/runtime/tensor.hpp"
 #include "openvino/runtime/infer_request.hpp"
 #include "openvino/runtime/properties.hpp"
@@ -28,23 +29,27 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
-    explicit CLIPTextModel(const std::filesystem::path& root_dir);
+    explicit CLIPTextModel(const std::filesystem::path& root_dir,
+                           const std::shared_ptr<ov::Core>& core = {});
 
     CLIPTextModel(const std::filesystem::path& root_dir,
                   const std::string& device,
-                  const ov::AnyMap& properties = {});
+                  const ov::AnyMap& properties = {},
+                  const std::shared_ptr<ov::Core>& core = {});
 
     CLIPTextModel(const std::string& model,
                   const Tensor& weights,
                   const Config& config,
-                  const Tokenizer& clip_tokenizer);
+                  const Tokenizer& clip_tokenizer,
+                  const std::shared_ptr<ov::Core>& core = {});
 
     CLIPTextModel(const std::string& model,
                   const Tensor& weights,
                   const Config& config,
                   const Tokenizer& clip_tokenizer,
                   const std::string& device,
-                  const ov::AnyMap& properties = {});
+                  const ov::AnyMap& properties = {},
+                  const std::shared_ptr<ov::Core>& core = {});
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
@@ -102,6 +107,7 @@ public:
 private:
     Config m_config;
     AdapterController m_adapter_controller;
+    std::shared_ptr<ov::Core> m_core;
     Tokenizer m_clip_tokenizer;
     bool m_slice_batch1_output = false;
 

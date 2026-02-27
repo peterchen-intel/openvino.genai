@@ -17,24 +17,24 @@ void check_arguments(const ov::AnyMap& parameters, std::set<std::string> allowed
     }
 }
 
-ov::Core core_with_extension() {
-    ov::Core core;
+std::shared_ptr<ov::Core> core_with_extension() {
+    auto core = std::make_shared<ov::Core>();
 
 #ifdef _WIN32
     const wchar_t* ov_tokenizer_path_w = _wgetenv(ScopedVar::ENVIRONMENT_VARIABLE_NAME_W);
     OPENVINO_ASSERT(ov_tokenizer_path_w, "openvino_tokenizers path is not set");
-    core.add_extension(std::wstring(ov_tokenizer_path_w));
+    core->add_extension(std::wstring(ov_tokenizer_path_w));
 #else
     const char* ov_tokenizer_path = getenv(ScopedVar::ENVIRONMENT_VARIABLE_NAME);
     OPENVINO_ASSERT(ov_tokenizer_path, "openvino_tokenizers path is not set");
-    core.add_extension(ov_tokenizer_path);
+    core->add_extension(ov_tokenizer_path);
 #endif
     
     return core;
 }
 
-ov::Core get_core_singleton() {
-    static ov::Core core = core_with_extension();
+std::shared_ptr<ov::Core> get_core_singleton() {
+    static std::shared_ptr<ov::Core> core = core_with_extension();
     return core;
 }
 
@@ -233,11 +233,27 @@ void Tokenizer::TokenizerImpl::set_state_if_necessary(CircularBufferQueueElement
     }
 }
 
-Tokenizer::TokenizerImpl::TokenizerImpl(const std::filesystem::path& models_path, const ov::AnyMap& properties) {
+Tokenizer::TokenizerImpl::TokenizerImpl(const std::filesystem::path& models_path, const ov::AnyMap& properties)
+    : m_core(get_core_singleton()),
+      m_uses_core_singleton(true) {
     setup_tokenizer(models_path, properties);
 }
 
-Tokenizer::TokenizerImpl::TokenizerImpl(const std::pair<std::shared_ptr<ov::Model>, std::shared_ptr<ov::Model>>& models, const ov::AnyMap& properties) {
+Tokenizer::TokenizerImpl::TokenizerImpl(const std::filesystem::path& models_path, const ov::AnyMap& properties, const std::shared_ptr<ov::Core>& core)
+    : m_core(core) {
+    OPENVINO_ASSERT(m_core, "Tokenizer requires a valid ov::Core");
+    setup_tokenizer(models_path, properties);
+}
+
+Tokenizer::TokenizerImpl::TokenizerImpl(const std::pair<std::shared_ptr<ov::Model>, std::shared_ptr<ov::Model>>& models, const ov::AnyMap& properties)
+    : m_core(get_core_singleton()),
+      m_uses_core_singleton(true) {
+    setup_tokenizer(models, properties);
+}
+
+Tokenizer::TokenizerImpl::TokenizerImpl(const std::pair<std::shared_ptr<ov::Model>, std::shared_ptr<ov::Model>>& models, const ov::AnyMap& properties, const std::shared_ptr<ov::Core>& core)
+    : m_core(core) {
+    OPENVINO_ASSERT(m_core, "Tokenizer requires a valid ov::Core");
     setup_tokenizer(models, properties);
 }
 
@@ -266,7 +282,7 @@ void filter_properties(ov::AnyMap& properties) {
 
 void Tokenizer::TokenizerImpl::setup_tokenizer(const std::filesystem::path& models_path, const ov::AnyMap& properties) {
     ScopedVar env_manager(tokenizers_relative_to_genai());
-    auto core = get_core_singleton();
+    OPENVINO_ASSERT(m_core, "Tokenizer core was not initialized");
 
     OPENVINO_ASSERT(models_path.extension() != ".xml", "'models_path' parameter should be a path to a dir not a xml file");
 
@@ -332,11 +348,11 @@ void Tokenizer::TokenizerImpl::setup_tokenizer(const std::filesystem::path& mode
         return;
     }
     if (std::filesystem::exists(models_path / "openvino_tokenizer.xml")) {
-        ov_tokenizer = core.read_model(models_path / "openvino_tokenizer.xml", {}, filtered_properties);
+        ov_tokenizer = m_core->read_model(models_path / "openvino_tokenizer.xml", {}, filtered_properties);
     }
 
     if (std::filesystem::exists(models_path / "openvino_detokenizer.xml")) {
-        ov_detokenizer = core.read_model(models_path / "openvino_detokenizer.xml", {}, filtered_properties);
+        ov_detokenizer = m_core->read_model(models_path / "openvino_detokenizer.xml", {}, filtered_properties);
     }
 
     read_config(models_path);
@@ -387,7 +403,7 @@ void Tokenizer::TokenizerImpl::setup_tokenizer(const std::pair<std::shared_ptr<o
 
     OPENVINO_ASSERT(ov_tokenizer || ov_detokenizer, "Neither tokenizer nor detokenzier models were provided");
 
-    auto core = get_core_singleton();
+    OPENVINO_ASSERT(m_core, "Tokenizer core was not initialized");
     std::string device = "CPU";  // only CPU is supported for now
 
     // Save openvino GenAI runtime version was added in 25.4 for GGUF models,
@@ -404,7 +420,7 @@ void Tokenizer::TokenizerImpl::setup_tokenizer(const std::pair<std::shared_ptr<o
         manager.register_pass<MakeAddSpecialTokensSatateful>();
         manager.register_pass<MakePaddingSatateful>();
         manager.run_passes(ov_tokenizer);
-        ov::CompiledModel tokenizer = core.compile_model(ov_tokenizer, device, properties);
+        ov::CompiledModel tokenizer = m_core->compile_model(ov_tokenizer, device, properties);
         ov::genai::utils::print_compiled_model_properties(tokenizer, "OV Tokenizer");
 
         m_ireq_queue_tokenizer = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
@@ -431,7 +447,7 @@ void Tokenizer::TokenizerImpl::setup_tokenizer(const std::pair<std::shared_ptr<o
         ov::pass::Manager manager_detok;
         manager_detok.register_pass<MakeVocabDecoderSatateful>();
         manager_detok.run_passes(ov_detokenizer);
-        ov::CompiledModel detokenizer = core.compile_model(ov_detokenizer, device, properties);
+        ov::CompiledModel detokenizer = m_core->compile_model(ov_detokenizer, device, properties);
         ov::genai::utils::print_compiled_model_properties(detokenizer, "OV Detokenizer");
 
         m_ireq_queue_detokenizer = std::make_unique<CircularBufferQueue<ov::InferRequest>>(

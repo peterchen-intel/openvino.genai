@@ -55,8 +55,9 @@ InputsEmbedderGemma3::InputsEmbedderGemma3(
     const VLMConfig& vlm_config,
     const std::filesystem::path& model_dir,
     const std::string& device,
-    const ov::AnyMap device_config) :
-    IInputsEmbedder(vlm_config, model_dir, device, device_config) { }
+    const ov::AnyMap device_config,
+    const std::shared_ptr<ov::Core>& core) :
+    IInputsEmbedder(vlm_config, model_dir, device, device_config, core) { }
 
 InputsEmbedderGemma3::InputsEmbedderGemma3(
     const VLMConfig& vlm_config,
@@ -64,8 +65,9 @@ InputsEmbedderGemma3::InputsEmbedderGemma3(
     const Tokenizer& tokenizer,
     const std::filesystem::path& config_dir_path,
     const std::string& device,
-    const ov::AnyMap device_config) :
-    IInputsEmbedder(vlm_config, models_map, tokenizer, config_dir_path, device, device_config) { }
+    const ov::AnyMap device_config,
+    const std::shared_ptr<ov::Core>& core) :
+    IInputsEmbedder(vlm_config, models_map, tokenizer, config_dir_path, device, device_config, core) { }
 
 bool InputsEmbedderGemma3::has_token_type_ids() const {
     return true;

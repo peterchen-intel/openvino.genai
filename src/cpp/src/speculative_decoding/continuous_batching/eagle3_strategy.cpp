@@ -7,8 +7,11 @@
 
 namespace ov::genai {
 ContinuousBatchingPipeline::Eagle3DecodingImpl::Eagle3DecodingImpl(const ov::genai::ModelDesc& main_model_desc,
-                                                                 const ov::genai::ModelDesc& draft_model_desc,
-                                                                 const std::vector<int32_t>& hidden_layers) {
+                                                                  const ov::genai::ModelDesc& draft_model_desc,
+                                                                  const std::vector<int32_t>& hidden_layers) {
+    if (main_model_desc.core) {
+        m_core = main_model_desc.core;
+    }
     auto scheduler_configs = init_speculative_models(main_model_desc, draft_model_desc);
     auto main_model = main_model_desc.model;
     auto draft_model = draft_model_desc.model;
@@ -19,6 +22,8 @@ ContinuousBatchingPipeline::Eagle3DecodingImpl::Eagle3DecodingImpl(const ov::gen
 
     ov::AnyMap draft_properties =
         draft_model_desc.properties.empty() ? main_model_desc.properties : draft_model_desc.properties;
+    auto main_core = main_model_desc.core ? main_model_desc.core : m_core;
+    auto draft_core = draft_model_desc.core ? draft_model_desc.core : main_core;
 
     // main and draft model use same tokenizer, but could differ in configurations
     // for example, llama3 draft model has different eos_token_id in config.json
@@ -40,14 +45,16 @@ ContinuousBatchingPipeline::Eagle3DecodingImpl::Eagle3DecodingImpl(const ov::gen
                                                                                scheduler_configs.first,
                                                                                main_device,
                                                                                main_model_desc.properties,
-                                                                               true);
+                                                                               true,
+                                                                               main_core);
     m_draft_pipeline = std::make_shared<ContinuousBatchingForEagle3DecodingImpl>(draft_model,
                                                                                 draft_model_tokenizer,
                                                                                 draft_model_desc.generation_config,
                                                                                 scheduler_configs.second,
                                                                                 draft_device,
                                                                                 draft_properties,
-                                                                                false);
+                                                                                false,
+                                                                                draft_core);
     m_perf_metrics = ov::genai::SDPerModelsPerfMetrics();
     m_perf_metrics.raw_metrics.m_inference_durations = {{MicroSeconds(0.0f)}};
     m_draft_pipeline->raw_perf_metrics.m_inference_durations = {{ MicroSeconds(0.0f) }};

@@ -13,11 +13,13 @@ class SpeechT5TTSDecoder {
 public:
     static std::shared_ptr<SpeechT5TTSDecoder> from_path(const std::filesystem::path& models_path,
                                                          const std::string& device,
-                                                         const ov::AnyMap& properties);
+                                                         const ov::AnyMap& properties,
+                                                         const std::shared_ptr<ov::Core>& core);
 
     SpeechT5TTSDecoder(const std::filesystem::path& models_path,
                        const std::string& device,
-                       const ov::AnyMap& properties);
+                       const ov::AnyMap& properties,
+                       const std::shared_ptr<ov::Core>& core);
 
     void start_async(const Tensor& inputs_embeds,
                      const Tensor& speaker_embeddings,

@@ -107,6 +107,7 @@ public:
                            const std::string& device,
                            const ov::AnyMap& properties,
                            const ov::genai::GenerationConfig& generation_config,
+                           const std::shared_ptr<ov::Core>& core = nullptr,
                            bool is_validation_mode_enabled = false);
 
     ContinuousBatchingImpl(const std::shared_ptr<ov::Model>& model,
@@ -116,6 +117,7 @@ public:
                            const std::string& device,
                            const ov::AnyMap& properties,
                            const ov::genai::GenerationConfig& generation_config,
+                           const std::shared_ptr<ov::Core>& core = nullptr,
                            bool is_validation_mode_enabled = false);
 
     virtual ~ContinuousBatchingImpl();

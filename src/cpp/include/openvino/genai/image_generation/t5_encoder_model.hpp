@@ -12,6 +12,7 @@
 #include "openvino/genai/lora_adapter.hpp"
 
 #include "openvino/core/any.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/runtime/tensor.hpp"
 #include "openvino/runtime/infer_request.hpp"
 #include "openvino/runtime/properties.hpp"
@@ -21,21 +22,25 @@ namespace genai {
 
 class OPENVINO_GENAI_EXPORTS T5EncoderModel {
 public:
-    explicit T5EncoderModel(const std::filesystem::path& root_dir);
+    explicit T5EncoderModel(const std::filesystem::path& root_dir,
+                            const std::shared_ptr<ov::Core>& core = {});
 
     T5EncoderModel(const std::filesystem::path& root_dir,
-                  const std::string& device,
-                  const ov::AnyMap& properties = {});
+                   const std::string& device,
+                   const ov::AnyMap& properties = {},
+                   const std::shared_ptr<ov::Core>& core = {});
 
     T5EncoderModel(const std::string& model,
                    const Tensor& weights,
-                   const Tokenizer& tokenizer);
+                   const Tokenizer& tokenizer,
+                   const std::shared_ptr<ov::Core>& core = {});
 
     T5EncoderModel(const std::string&model,
                    const Tensor& weights,
                    const Tokenizer& tokenizer,
                    const std::string& device,
-                   const ov::AnyMap& properties = {});
+                   const ov::AnyMap& properties = {},
+                   const std::shared_ptr<ov::Core>& core = {});
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
@@ -85,6 +90,7 @@ private:
     //TODO: skip filling when pipeline doesn't use attention mask
     ov::Tensor m_prompt_attention_mask;
 
+    std::shared_ptr<ov::Core> m_core;
     Tokenizer m_tokenizer;
 };
 

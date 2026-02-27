@@ -4,6 +4,7 @@
 #pragma once
 #include <memory>
 #include "openvino/runtime/infer_request.hpp"
+#include "openvino/runtime/core.hpp"
 
 #include "openvino/genai/common_types.hpp"
 #include "visual_language/vlm_config.hpp"
@@ -100,7 +101,8 @@ public:
         const std::filesystem::path& model_dir,
         const VLMModelType model_type,
         const std::string& device,
-        const ov::AnyMap properties = {});
+        const ov::AnyMap properties = {},
+        const std::shared_ptr<ov::Core>& core = nullptr);
 
     /// @brief Constructs the encoder from models map.
     /// @param models_map Models map
@@ -114,7 +116,8 @@ public:
         const std::filesystem::path& config_dir_path,
         const VLMModelType model_type,
         const std::string& device,
-        const ov::AnyMap properties = {});
+        const ov::AnyMap properties = {},
+        const std::shared_ptr<ov::Core>& core = nullptr);
 
     /// @brief Compute embeddings of an image given
     /// ProcessorConfig members.
@@ -138,6 +141,7 @@ public:
 protected:
     /// @brief  Infer requests queue for image encoding model.
     std::unique_ptr<CircularBufferQueue<ov::InferRequest>> m_ireq_queue_vision_encoder;
+    std::shared_ptr<ov::Core> m_core;
 
     /// @brief A config to follow.
     ProcessorConfig m_processor_config;
@@ -146,13 +150,15 @@ public:
     VisionEncoder(
         const std::filesystem::path& model_dir,
         const std::string& device,
-        const ov::AnyMap properties);
+        const ov::AnyMap properties,
+        const std::shared_ptr<ov::Core>& core = nullptr);
 
     VisionEncoder(
         const ModelsMap& models_map,
         const std::filesystem::path& config_dir_path,
         const std::string& device,
-        const ov::AnyMap properties);
+        const ov::AnyMap properties,
+        const std::shared_ptr<ov::Core>& core = nullptr);
 };
 
 } // namespace ov::genai

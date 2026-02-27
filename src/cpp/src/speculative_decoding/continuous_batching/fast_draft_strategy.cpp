@@ -92,7 +92,8 @@ ContinuousBatchingPipeline::SpeculativeDecodingImpl::init_speculative_models(con
 }
 
 ContinuousBatchingPipeline::SpeculativeDecodingImpl::SpeculativeDecodingImpl(const ov::genai::ModelDesc& main_model_desc,
-                                                                             const ov::genai::ModelDesc& draft_model_desc) {
+                                                                             const ov::genai::ModelDesc& draft_model_desc)
+    : IContinuousBatchingPipeline(main_model_desc.core) {
     auto scheduler_configs = init_speculative_models(main_model_desc, draft_model_desc);
 
     auto main_device = main_model_desc.device;
@@ -106,13 +107,15 @@ ContinuousBatchingPipeline::SpeculativeDecodingImpl::SpeculativeDecodingImpl(con
     OPENVINO_ASSERT(are_tokenizers_equal(main_model_tokenizer, draft_model_tokenizer), "Tokenizers for draft and main models are different!");
     m_tokenizer = main_model_tokenizer;
     ov::AnyMap draft_properties = draft_model_desc.properties.empty() ? main_model_desc.properties : draft_model_desc.properties;
+    auto main_core = main_model_desc.core ? main_model_desc.core : m_core;
+    auto draft_core = draft_model_desc.core ? draft_model_desc.core : main_core;
     // to create `main_pipeline` with enabled validation_mode and `draft_pipeline` with disabled validation mode
     m_main_pipeline = std::make_shared<ContinuousBatchingForSpeculativeDecodingImpl>(
         main_model_desc.model, main_model_tokenizer, main_model_desc.generation_config,
-        scheduler_configs.first, main_device, main_model_desc.properties, true);
+        scheduler_configs.first, main_device, main_model_desc.properties, true, main_core);
     m_draft_pipeline = std::make_shared<ContinuousBatchingForSpeculativeDecodingImpl>(
         draft_model_desc.model, draft_model_tokenizer, draft_model_desc.generation_config,
-        scheduler_configs.second, draft_device, draft_properties, false);
+        scheduler_configs.second, draft_device, draft_properties, false, draft_core);
 
     m_perf_metrics = ov::genai::SDPerModelsPerfMetrics();
     m_draft_pipeline->raw_perf_metrics.m_inference_durations =  {{ MicroSeconds(0.0f) }};

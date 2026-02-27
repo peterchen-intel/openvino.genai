@@ -8,6 +8,7 @@
 #include <variant>
 
 #include "openvino/genai/tokenizer.hpp"
+#include "openvino/runtime/core.hpp"
 
 namespace ov {
 namespace genai {
@@ -190,6 +191,7 @@ public:
 
 private:
     class TextEmbeddingPipelineImpl;
+    std::shared_ptr<ov::Core> m_core;
     std::unique_ptr<TextEmbeddingPipelineImpl> m_impl;
 };
 

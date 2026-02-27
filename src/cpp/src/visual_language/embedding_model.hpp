@@ -36,29 +36,33 @@ public:
     EmbeddingsModel(const std::filesystem::path& model_dir,
                     const float scale_emb,
                     const std::string& device,
-                    const ov::AnyMap& properties);
+                    const ov::AnyMap& properties,
+                    const std::shared_ptr<ov::Core>& core = nullptr);
 
     EmbeddingsModel(const std::string& model,
                     const ov::Tensor& weights,
                     const float scale_emb,
                     const std::string& device,
-                    const ov::AnyMap& properties);
+                    const ov::AnyMap& properties,
+                    const std::shared_ptr<ov::Core>& core = nullptr);
 
     EmbeddingsModel() = default;
 
     static Ptr create(const std::filesystem::path& model_dir,
                       const float scale_emb,
                       const std::string& device,
-                      const ov::AnyMap& properties) {
-        return std::make_shared<EmbeddingsModel>(model_dir, scale_emb, device, properties);
+                      const ov::AnyMap& properties,
+                      const std::shared_ptr<ov::Core>& core = nullptr) {
+        return std::make_shared<EmbeddingsModel>(model_dir, scale_emb, device, properties, core);
     }
 
     static Ptr create(const std::string& model,
                       const ov::Tensor& weights,
                       const float scale_emb,
                       const std::string& device,
-                      const ov::AnyMap& properties) {
-        return std::make_shared<EmbeddingsModel>(model, weights, scale_emb, device, properties);
+                      const ov::AnyMap& properties,
+                      const std::shared_ptr<ov::Core>& core = nullptr) {
+        return std::make_shared<EmbeddingsModel>(model, weights, scale_emb, device, properties, core);
     }
 
     // We have getter for the request queue, so we can reserve request outside of infer scope

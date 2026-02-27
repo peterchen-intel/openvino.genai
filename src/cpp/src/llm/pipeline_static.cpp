@@ -95,11 +95,16 @@ namespace static_llm {
 StatefulLLMPipeline::StatefulLLMPipeline(
     const std::filesystem::path& models_path,
     const ov::genai::Tokenizer& tokenizer,
-    const ov::AnyMap& config
+    const ov::AnyMap& config,
+    const std::shared_ptr<ov::Core>& core
 ): StatefulLLMPipeline(
-       genai::utils::singleton_core().read_model(models_path / "openvino_model.xml", {}, config),
+       [&]() {
+           OPENVINO_ASSERT(core, "Static StatefulLLMPipeline requires a valid ov::Core");
+           return core->read_model(models_path / "openvino_model.xml", {}, config);
+       }(),
        tokenizer, config,
-       utils::from_config_json_if_exists(models_path)
+       utils::from_config_json_if_exists(models_path),
+       core
    ) {
 }
 
@@ -107,11 +112,14 @@ StatefulLLMPipeline::StatefulLLMPipeline(
     const std::shared_ptr<ov::Model>& model,
     const ov::genai::Tokenizer& tokenizer,
     const ov::AnyMap& properties,
-    const ov::genai::GenerationConfig& generation_config
+    const ov::genai::GenerationConfig& generation_config,
+    const std::shared_ptr<ov::Core>& core
 ) : LLMPipelineImplBase(tokenizer, generation_config),
-    m_sampler(m_tokenizer) {
+    m_sampler(m_tokenizer),
+    m_core(core) {
+    OPENVINO_ASSERT(m_core, "Static StatefulLLMPipeline requires a valid ov::Core");
     auto kv_pos = ov::genai::utils::get_kv_axes_pos(model);
-    auto [compiled, kv_desc] = utils::compile_decoder_for_npu(model, properties, kv_pos);
+    auto [compiled, kv_desc] = utils::compile_decoder_for_npu(model, properties, kv_pos, false, m_core);
     m_max_prompt_len = kv_desc.max_prompt_len;
     m_kvcache_total = kv_desc.max_prompt_len + kv_desc.min_response_len;
     m_request = compiled.create_infer_request();
@@ -388,21 +396,26 @@ StatefulLLMPipeline::~StatefulLLMPipeline() {
 
 std::unique_ptr<LLMPipelineImplBase>
 LLMPipelineFactory::create(const std::filesystem::path& models_path,
-                           const ov::AnyMap& config) {
-    return create(models_path, Tokenizer(models_path), config);
+                           const ov::AnyMap& config,
+                           const std::shared_ptr<ov::Core>& core) {
+    auto pipeline_core = core ? core : utils::create_core();
+    return create(models_path, Tokenizer(models_path, pipeline_core), config, pipeline_core);
 }
 
 std::unique_ptr<LLMPipelineImplBase> LLMPipelineFactory::create(const std::shared_ptr<ov::Model>& model,
                                                                 const ov::genai::Tokenizer& tokenizer,
                                                                 const ov::AnyMap& properties,
-                                                                const ov::genai::GenerationConfig& generation_config) {
+                                                                const ov::genai::GenerationConfig& generation_config,
+                                                                const std::shared_ptr<ov::Core>& core) {
+    auto pipeline_core = core ? core : utils::create_core();
     auto properties_copy = properties;
     const auto pipeline_mode = str_to_pipeline(utils::pop_or_default(properties_copy, "STATIC_PIPELINE", std::string("STATEFUL")));
     if (pipeline_mode == StaticPipelineKind::STATEFUL) {
         return std::make_unique<ov::genai::static_llm::StatefulLLMPipeline>(model,
-                                                                            tokenizer,
-                                                                            properties_copy,
-                                                                            generation_config);
+                                                                             tokenizer,
+                                                                             properties_copy,
+                                                                             generation_config,
+                                                                             pipeline_core);
     }
     OPENVINO_ASSERT(false);
 }
@@ -410,11 +423,13 @@ std::unique_ptr<LLMPipelineImplBase> LLMPipelineFactory::create(const std::share
 std::unique_ptr<LLMPipelineImplBase>
 LLMPipelineFactory::create(const std::filesystem::path& models_path,
                            const ov::genai::Tokenizer& tokenizer,
-                           const ov::AnyMap& config) {
+                           const ov::AnyMap& config,
+                           const std::shared_ptr<ov::Core>& core) {
+    auto pipeline_core = core ? core : utils::create_core();
     auto properties = config;
     const auto pipeline_mode = str_to_pipeline(utils::pop_or_default(properties, "STATIC_PIPELINE", std::string("STATEFUL")));
     if (pipeline_mode == StaticPipelineKind::STATEFUL) {
-        return std::make_unique<ov::genai::static_llm::StatefulLLMPipeline>(models_path, tokenizer, properties);
+        return std::make_unique<ov::genai::static_llm::StatefulLLMPipeline>(models_path, tokenizer, properties, pipeline_core);
     }
     OPENVINO_ASSERT(false);
 }

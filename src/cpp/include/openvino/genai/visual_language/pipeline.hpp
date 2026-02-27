@@ -11,6 +11,7 @@
 #include "openvino/genai/streamer_base.hpp"
 #include "openvino/genai/tokenizer.hpp"
 #include "openvino/genai/visual_language/perf_metrics.hpp"
+#include "openvino/runtime/core.hpp"
 
 namespace ov::genai {
 
@@ -291,6 +292,7 @@ private:
     class VLMPipelineBase;
     class VLMPipelineImpl;
     class VLMContinuousBatchingAdapter;
+    std::shared_ptr<ov::Core> m_core;
     std::unique_ptr<VLMPipelineBase> m_pimpl;
 };
 

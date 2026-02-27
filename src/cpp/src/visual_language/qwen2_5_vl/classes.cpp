@@ -95,8 +95,9 @@ InputsEmbedderQwen2_5_VL::InputsEmbedderQwen2_5_VL(
     const VLMConfig& vlm_config,
     const std::filesystem::path& model_dir,
     const std::string& device,
-    const ov::AnyMap device_config) :
-    InputsEmbedderQwen2VL(vlm_config, model_dir, device, device_config) {}
+    const ov::AnyMap device_config,
+    const std::shared_ptr<ov::Core>& core) :
+    InputsEmbedderQwen2VL(vlm_config, model_dir, device, device_config, core) {}
 
 InputsEmbedderQwen2_5_VL::InputsEmbedderQwen2_5_VL(
     const VLMConfig& vlm_config,
@@ -104,8 +105,9 @@ InputsEmbedderQwen2_5_VL::InputsEmbedderQwen2_5_VL(
     const Tokenizer& tokenizer, 
     const std::filesystem::path& config_dir_path,
     const std::string& device,
-    const ov::AnyMap device_config) :
-    InputsEmbedderQwen2VL(vlm_config, models_map, tokenizer, config_dir_path, device, device_config) {}
+    const ov::AnyMap device_config,
+    const std::shared_ptr<ov::Core>& core) :
+    InputsEmbedderQwen2VL(vlm_config, models_map, tokenizer, config_dir_path, device, device_config, core) {}
 
 std::pair<ov::Tensor, ov::Tensor> InputsEmbedderQwen2_5_VL::run_video_image_embeddings_merger(
     const std::vector<EncodedImage>& images, 

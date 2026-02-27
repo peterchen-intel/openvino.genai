@@ -44,12 +44,13 @@ ov::Tensor SpeechT5TTSDecoder::create_host_tensor(const element::Type element_ty
 
 SpeechT5TTSDecoder::SpeechT5TTSDecoder(const std::filesystem::path& models_path,
                                        const std::string& device,
-                                       const ov::AnyMap& properties) {
-    ov::Core core = utils::singleton_core();
+                                       const ov::AnyMap& properties,
+                                       const std::shared_ptr<ov::Core>& core) {
+    OPENVINO_ASSERT(core, "SpeechT5 TTS decoder requires a valid ov::Core");
 
-    auto model = core.read_model(models_path / "openvino_decoder_model.xml", {}, properties);
+    auto model = core->read_model(models_path / "openvino_decoder_model.xml", {}, properties);
     patch_model_with_spectrogram(model);
-    auto compiled_model = core.compile_model(model, device, properties);
+    auto compiled_model = core->compile_model(model, device, properties);
 
     utils::print_compiled_model_properties(compiled_model, "speecht5_tts decoder model");
     m_request = compiled_model.create_infer_request();
@@ -59,8 +60,9 @@ SpeechT5TTSDecoder::SpeechT5TTSDecoder(const std::filesystem::path& models_path,
 
 std::shared_ptr<SpeechT5TTSDecoder> SpeechT5TTSDecoder::from_path(const std::filesystem::path& models_path,
                                                                   const std::string& device,
-                                                                  const ov::AnyMap& properties) {
-    return std::make_shared<SpeechT5TTSDecoder>(models_path, device, properties);
+                                                                  const ov::AnyMap& properties,
+                                                                  const std::shared_ptr<ov::Core>& core) {
+    return std::make_shared<SpeechT5TTSDecoder>(models_path, device, properties, core);
 }
 
 void SpeechT5TTSDecoder::start_async(const Tensor& inputs_embeds,

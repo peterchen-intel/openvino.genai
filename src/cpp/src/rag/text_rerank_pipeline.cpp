@@ -131,6 +131,10 @@ std::shared_ptr<Model> apply_qwen3_postprocessing(std::shared_ptr<Model> model,
     return processor.build();
 }
 
+std::shared_ptr<ov::Core> create_text_rerank_core() {
+    return utils::create_core();
+}
+
 }  // namespace
 
 namespace ov {
@@ -149,8 +153,11 @@ public:
     TextRerankPipelineImpl(const std::filesystem::path& models_path,
                            const std::string& device,
                            const Config& config,
+                           const std::shared_ptr<ov::Core>& core,
                            const ov::AnyMap& properties = {})
-        : m_config{config} {
+        : m_core{core},
+          m_config{config} {
+        OPENVINO_ASSERT(m_core, "TextRerankPipeline requires a valid ov::Core");
         const auto model_type = read_model_type(models_path);
         const bool is_qwen3 = model_type.has_value() && model_type.value() == "qwen3";
 
@@ -167,11 +174,9 @@ public:
         }
 
         // qwen3 tokenizer doesn't support add_second_input(true)
-        m_tokenizer = Tokenizer(models_path, ov::genai::add_second_input(!is_qwen3));
+        m_tokenizer = Tokenizer(models_path, m_core, ov::AnyMap{ov::genai::add_second_input(!is_qwen3)});
 
-        ov::Core core = utils::singleton_core();
-
-        auto model = core.read_model(models_path / "openvino_model.xml", {}, properties);
+        auto model = m_core->read_model(models_path / "openvino_model.xml", {}, properties);
 
         m_has_position_ids = has_input(model, "position_ids");
         m_has_beam_idx = has_input(model, "beam_idx");
@@ -185,7 +190,7 @@ public:
             model = apply_postprocessing(model);
         }
 
-        ov::CompiledModel compiled_model = core.compile_model(model, device, properties);
+        ov::CompiledModel compiled_model = m_core->compile_model(model, device, properties);
 
         utils::print_compiled_model_properties(compiled_model, "text rerank model");
         m_request = compiled_model.create_infer_request();
@@ -261,6 +266,7 @@ public:
     }
 
 private:
+    std::shared_ptr<ov::Core> m_core;
     Tokenizer m_tokenizer;
     InferRequest m_request;
     Config m_config;
@@ -288,14 +294,17 @@ TextRerankPipeline::TextRerankPipeline(const std::filesystem::path& models_path,
                                        const std::string& device,
                                        const Config& config,
                                        const ov::AnyMap& properties)
-    : m_impl{std::make_unique<TextRerankPipelineImpl>(models_path, device, config, properties)} {};
+    : m_core{create_text_rerank_core()},
+      m_impl{std::make_unique<TextRerankPipelineImpl>(models_path, device, config, m_core, properties)} {};
 
 TextRerankPipeline::TextRerankPipeline(const std::filesystem::path& models_path,
                                        const std::string& device,
                                        const ov::AnyMap& properties)
-    : m_impl{std::make_unique<TextRerankPipelineImpl>(models_path,
+    : m_core{create_text_rerank_core()},
+      m_impl{std::make_unique<TextRerankPipelineImpl>(models_path,
                                                       device,
                                                       Config(properties),
+                                                      m_core,
                                                       remove_config_properties(properties))} {};
 
 std::vector<std::pair<size_t, float>> TextRerankPipeline::rerank(const std::string& query,

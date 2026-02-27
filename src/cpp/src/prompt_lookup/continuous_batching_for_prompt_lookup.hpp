@@ -19,6 +19,7 @@ public:
         const std::string& device,
         const ov::AnyMap& properties,
         const ov::genai::GenerationConfig& generation_config,
+        const std::shared_ptr<ov::Core>& core = nullptr,
         bool is_validation_mode_enabled = false) :
     ContinuousBatchingImpl{ model,
                             tokenizer,
@@ -26,6 +27,7 @@ public:
                             device,
                             properties,
                             generation_config,
+                            core,
                             true } {};
                             
     void generate_candidates();

@@ -17,7 +17,8 @@ StatefulLLMPipeline::StatefulLLMPipeline(
     const ov::genai::Tokenizer& tokenizer,
     OptionalGenerationConfig generation_config)
     : LLMPipelineImplBase(tokenizer, generation_config.value_or(GenerationConfig())),
-    m_model_runner(request) {
+    m_model_runner(request),
+    m_core(utils::create_core()) {
     auto compiled_model = m_model_runner.get_compiled_model();
     auto execution_devices = compiled_model.get_property(ov::execution_devices);
     if (execution_devices[0].find("NPU") != std::string::npos) {
@@ -33,13 +34,18 @@ StatefulLLMPipeline::StatefulLLMPipeline(
     const std::filesystem::path& models_path,
     const ov::genai::Tokenizer& tokenizer,
     const std::string& device,
-    const ov::AnyMap& properties)
+    const ov::AnyMap& properties,
+    const std::shared_ptr<ov::Core>& core)
     : StatefulLLMPipeline{
-        utils::read_model(models_path, properties),
+        [&]() {
+            OPENVINO_ASSERT(core, "StatefulLLMPipeline requires a valid ov::Core");
+            return utils::read_model(*core, models_path, properties);
+        }(),
         tokenizer,
         device,
         properties,
-        utils::from_config_json_if_exists(models_path)
+        utils::from_config_json_if_exists(models_path),
+        core
     } {}
 
 StatefulLLMPipeline::StatefulLLMPipeline(
@@ -47,8 +53,10 @@ StatefulLLMPipeline::StatefulLLMPipeline(
     const ov::genai::Tokenizer& tokenizer,
     const std::string& device,
     const ov::AnyMap& properties,
-    const ov::genai::GenerationConfig& generation_config)
-    : LLMPipelineImplBase(tokenizer, generation_config), m_sampler(m_tokenizer) {
+    const ov::genai::GenerationConfig& generation_config,
+    const std::shared_ptr<ov::Core>& core)
+    : LLMPipelineImplBase(tokenizer, generation_config), m_sampler(m_tokenizer), m_core(core) {
+    OPENVINO_ASSERT(m_core, "StatefulLLMPipeline requires a valid ov::Core");
     if (device.find("NPU") != std::string::npos) {
         m_is_npu = true;
         m_use_full_chat_history = true;
@@ -74,11 +82,11 @@ StatefulLLMPipeline::StatefulLLMPipeline(
     ov::CompiledModel compiled_model;
     if (m_is_npu) {
         utils::KVDesc kv_desc;
-        std::tie(compiled_model, kv_desc) = utils::compile_decoder_for_npu(model, *filtered_properties, kv_pos);
+        std::tie(compiled_model, kv_desc) = utils::compile_decoder_for_npu(model, *filtered_properties, kv_pos, false, m_core);
         m_max_prompt_len = kv_desc.max_prompt_len;
         m_max_kv_cache_size = kv_desc.max_prompt_len + kv_desc.min_response_len;
     } else {
-       compiled_model = utils::singleton_core().compile_model(model, device, *filtered_properties);
+       compiled_model = m_core->compile_model(model, device, *filtered_properties);
     }
     m_model_runner = compiled_model.create_infer_request();
     ov::genai::utils::print_compiled_model_properties(compiled_model, "Stateful LLM model");
@@ -93,8 +101,9 @@ StatefulLLMPipeline::StatefulLLMPipeline(
 StatefulLLMPipeline::StatefulLLMPipeline(
     const std::filesystem::path& models_path,
     const std::string& device,
-    const ov::AnyMap& plugin_config)
-    : StatefulLLMPipeline{models_path, Tokenizer(models_path, plugin_config), device, plugin_config} {}
+    const ov::AnyMap& plugin_config,
+    const std::shared_ptr<ov::Core>& core)
+    : StatefulLLMPipeline{models_path, Tokenizer(models_path, core, plugin_config), device, plugin_config, core} {}
 
 GenerationConfig StatefulLLMPipeline::resolve_generation_config(OptionalGenerationConfig generation_config) const {
     GenerationConfig config = generation_config.value_or(m_generation_config);

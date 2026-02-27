@@ -216,8 +216,9 @@ InputsEmbedderInternVLChat::InputsEmbedderInternVLChat(
     const VLMConfig& vlm_config,
     const std::filesystem::path& model_dir,
     const std::string& device,
-    const ov::AnyMap device_config) :
-    IInputsEmbedder(vlm_config, model_dir, device, device_config) { }
+    const ov::AnyMap device_config,
+    const std::shared_ptr<ov::Core>& core) :
+    IInputsEmbedder(vlm_config, model_dir, device, device_config, core) { }
 
 InputsEmbedderInternVLChat::InputsEmbedderInternVLChat(
     const VLMConfig& vlm_config,
@@ -225,8 +226,9 @@ InputsEmbedderInternVLChat::InputsEmbedderInternVLChat(
     const Tokenizer& tokenizer,
     const std::filesystem::path& config_dir_path,
     const std::string& device,
-    const ov::AnyMap device_config) :
-    IInputsEmbedder(vlm_config, models_map, tokenizer, config_dir_path, device, device_config) { }
+    const ov::AnyMap device_config,
+    const std::shared_ptr<ov::Core>& core) :
+    IInputsEmbedder(vlm_config, models_map, tokenizer, config_dir_path, device, device_config, core) { }
 
 
 NormalizedPrompt InputsEmbedderInternVLChat::normalize_prompt(const std::string& prompt, size_t base_id, const std::vector<EncodedImage>& images) const {

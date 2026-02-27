@@ -120,14 +120,14 @@ public:
 
         const std::string text_encoder = data["text_encoder"][1].get<std::string>();
         if (text_encoder == "CLIPTextModel") {
-            m_clip_text_encoder = std::make_shared<CLIPTextModel>(root_dir / "text_encoder");
+            m_clip_text_encoder = std::make_shared<CLIPTextModel>(root_dir / "text_encoder", m_core);
         } else {
             OPENVINO_THROW("Unsupported '", text_encoder, "' text encoder type");
         }
 
         const std::string t5_text_encoder = data["text_encoder_2"][1].get<std::string>();
         if (t5_text_encoder == "T5EncoderModel") {
-            m_t5_text_encoder = std::make_shared<T5EncoderModel>(root_dir / "text_encoder_2");
+            m_t5_text_encoder = std::make_shared<T5EncoderModel>(root_dir / "text_encoder_2", m_core);
         } else {
             OPENVINO_THROW("Unsupported '", t5_text_encoder, "' text encoder type");
         }
@@ -135,9 +135,9 @@ public:
         const std::string vae = data["vae"][1].get<std::string>();
         if (vae == "AutoencoderKL") {
             if (m_pipeline_type == PipelineType::TEXT_2_IMAGE)
-                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder");
+                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder", m_core);
             else if (m_pipeline_type == PipelineType::IMAGE_2_IMAGE || m_pipeline_type == PipelineType::INPAINTING) {
-                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_encoder", root_dir / "vae_decoder");
+                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_encoder", root_dir / "vae_decoder", m_core);
             } else {
                 OPENVINO_ASSERT("Unsupported pipeline type");
             }
@@ -147,7 +147,7 @@ public:
 
         const std::string transformer = data["transformer"][1].get<std::string>();
         if (transformer == "FluxTransformer2DModel") {
-            m_transformer = std::make_shared<FluxTransformer2DModel>(root_dir / "transformer");
+            m_transformer = std::make_shared<FluxTransformer2DModel>(root_dir / "transformer", m_core);
         } else {
             OPENVINO_THROW("Unsupported '", transformer, "' Transformer type");
         }
@@ -179,14 +179,14 @@ public:
 
         const std::string text_encoder = data["text_encoder"][1].get<std::string>();
         if (text_encoder == "CLIPTextModel") {
-            m_clip_text_encoder = std::make_shared<CLIPTextModel>(root_dir / "text_encoder", device, *updated_properties);
+            m_clip_text_encoder = std::make_shared<CLIPTextModel>(root_dir / "text_encoder", device, *updated_properties, m_core);
         } else {
             OPENVINO_THROW("Unsupported '", text_encoder, "' text encoder type");
         }
 
         const std::string t5_text_encoder = data["text_encoder_2"][1].get<std::string>();
         if (t5_text_encoder == "T5EncoderModel") {
-            m_t5_text_encoder = std::make_shared<T5EncoderModel>(root_dir / "text_encoder_2", device, *updated_properties);
+            m_t5_text_encoder = std::make_shared<T5EncoderModel>(root_dir / "text_encoder_2", device, *updated_properties, m_core);
         } else {
             OPENVINO_THROW("Unsupported '", t5_text_encoder, "' text encoder type");
         }
@@ -194,9 +194,9 @@ public:
         const std::string vae = data["vae"][1].get<std::string>();
         if (vae == "AutoencoderKL") {
             if (m_pipeline_type == PipelineType::TEXT_2_IMAGE)
-                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder", device, *updated_properties);
+                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder", device, *updated_properties, m_core);
             else if (m_pipeline_type == PipelineType::IMAGE_2_IMAGE || m_pipeline_type == PipelineType::INPAINTING) {
-                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_encoder", root_dir / "vae_decoder", device, *updated_properties);
+                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_encoder", root_dir / "vae_decoder", device, *updated_properties, m_core);
             } else {
                 OPENVINO_ASSERT("Unsupported pipeline type");
             }
@@ -206,7 +206,7 @@ public:
 
         const std::string transformer = data["transformer"][1].get<std::string>();
         if (transformer == "FluxTransformer2DModel") {
-            m_transformer = std::make_shared<FluxTransformer2DModel>(root_dir / "transformer", device, *updated_properties);
+            m_transformer = std::make_shared<FluxTransformer2DModel>(root_dir / "transformer", device, *updated_properties, m_core);
         } else {
             OPENVINO_THROW("Unsupported '", transformer, "' Transformer type");
         }

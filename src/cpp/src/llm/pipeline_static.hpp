@@ -15,15 +15,18 @@ namespace static_llm {
 struct LLMPipelineFactory {
     static std::unique_ptr<LLMPipelineImplBase> create(const std::filesystem::path& models_path,
                                                        const ov::genai::Tokenizer& tokenizer,
-                                                       const ov::AnyMap& config);
+                                                       const ov::AnyMap& config,
+                                                       const std::shared_ptr<ov::Core>& core = nullptr);
 
     static std::unique_ptr<LLMPipelineImplBase> create(const std::filesystem::path& models_path,
-                                                       const ov::AnyMap& config);
+                                                       const ov::AnyMap& config,
+                                                       const std::shared_ptr<ov::Core>& core = nullptr);
 
     static std::unique_ptr<LLMPipelineImplBase> create(const std::shared_ptr<ov::Model>& model,
                                                        const ov::genai::Tokenizer& tokenizer,
                                                        const ov::AnyMap& properties,
-                                                       const ov::genai::GenerationConfig& generation_config);
+                                                       const ov::genai::GenerationConfig& generation_config,
+                                                       const std::shared_ptr<ov::Core>& core = nullptr);
 };
 
 class StatefulLLMPipeline : public LLMPipelineImplBase {
@@ -31,14 +34,16 @@ public:
     StatefulLLMPipeline(
         const std::filesystem::path& path,
         const ov::genai::Tokenizer& tokenizer,
-        const ov::AnyMap& config
+        const ov::AnyMap& config,
+        const std::shared_ptr<ov::Core>& core
     );
 
     StatefulLLMPipeline(
         const std::shared_ptr<ov::Model>& model,
         const ov::genai::Tokenizer& tokenizer,
         const ov::AnyMap& properties,
-        const ov::genai::GenerationConfig& generation_config
+        const ov::genai::GenerationConfig& generation_config,
+        const std::shared_ptr<ov::Core>& core
     );
 
     DecodedResults generate(
@@ -67,6 +72,7 @@ private:
     uint32_t m_max_prompt_len = 0u;
     uint32_t m_kvcache_total = 0u;
     ov::InferRequest m_request;
+    std::shared_ptr<ov::Core> m_core;
 
     Sampler m_sampler;
 

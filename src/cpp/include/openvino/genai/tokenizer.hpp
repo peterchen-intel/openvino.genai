@@ -8,8 +8,10 @@
 #include <initializer_list>
 #include <filesystem>
 #include <optional>
+#include <memory>
 
 #include "openvino/runtime/tensor.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/genai/visibility.hpp"
 #include <openvino/runtime/properties.hpp>
 
@@ -49,6 +51,13 @@ public:
      * @param properties Properties passed to ov::Core::compile_model
      */
     explicit Tokenizer(const std::filesystem::path& tokenizer_path, const ov::AnyMap& properties = {});
+    /**
+     * @brief ov::genai::Tokenizer constructor with external ov::Core.
+     * @param tokenizer_path openvino_tokenizer.xml and openvino_detokenizer.xml should be located in the tokenizer_path
+     * @param core shared ov::Core configured with tokenizer extension
+     * @param properties Properties passed to ov::Core::compile_model
+     */
+    Tokenizer(const std::filesystem::path& tokenizer_path, const std::shared_ptr<ov::Core>& core, const ov::AnyMap& properties = {});
 
     /**
      * @brief ov::genai::Tokenizer constructor to initialize directly from model and weights
@@ -69,6 +78,18 @@ public:
         const ov::Tensor& detokenizer_weights_tensor,
         const ov::AnyMap& properties = {}
     );
+    /**
+     * @brief ov::genai::Tokenizer constructor to initialize directly from model and weights with external ov::Core.
+     * @param core shared ov::Core configured with tokenizer extension
+     */
+    Tokenizer(
+        const std::string& tokenizer_model_str,
+        const ov::Tensor& tokenizer_weights_tensor,
+        const std::string& detokenizer_model_str,
+        const ov::Tensor& detokenizer_weights_tensor,
+        const std::shared_ptr<ov::Core>& core,
+        const ov::AnyMap& properties = {}
+    );
 
     /**
      * @brief ov::genai::Tokenizer constructor to initialize directly from model and weights.
@@ -81,6 +102,11 @@ public:
      * @param properties Properties passed to ov::Core::compile_model
      */
     Tokenizer(const std::string& model_str, ov::Tensor& weights_tensor, const ov::AnyMap& properties = {});
+    /**
+     * @brief ov::genai::Tokenizer constructor to initialize from model and weights with external ov::Core.
+     * @param core shared ov::Core configured with tokenizer extension
+     */
+    Tokenizer(const std::string& model_str, ov::Tensor& weights_tensor, const std::shared_ptr<ov::Core>& core, const ov::AnyMap& properties = {});
 
     /**
      * @brief ov::genai::Tokenizer constructor with variable number of properties

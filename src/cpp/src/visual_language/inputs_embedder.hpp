@@ -12,6 +12,7 @@
 #include "lm_encoding.hpp"
 #include "openvino/genai/tokenizer.hpp"
 #include "openvino/genai/visual_language/pipeline.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/runtime/tensor.hpp"
 #include "openvino/runtime/infer_request.hpp"
 #include "visual_language/vlm_config.hpp"
@@ -35,13 +36,15 @@ class InputsEmbedder {
 public:
     InputsEmbedder(const std::filesystem::path& model_dir,
                    const std::string& device,
-                   const ov::AnyMap device_config);
+                   const ov::AnyMap device_config,
+                   const std::shared_ptr<ov::Core>& core = nullptr);
 
     InputsEmbedder(const ModelsMap& models_map,
                    const Tokenizer& tokenizer,
                    const std::filesystem::path& config_dir_path,
                    const std::string& device,
-                   const ov::AnyMap device_config);
+                   const ov::AnyMap device_config,
+                   const std::shared_ptr<ov::Core>& core = nullptr);
 
     // compute input embedding for prompt and multiple images
     ov::Tensor get_inputs_embeds(const std::string& prompt, const std::vector<ov::genai::EncodedImage>& images, ov::genai::VLMPerfMetrics& metrics, bool recalculate_merged_embeddings = true, const std::vector<size_t>& image_sequence = {});
@@ -130,6 +133,7 @@ private:
         // Input shape: [N, conversation length].
         // Output shape: [1, conversation length, hidden_size].
         EmbeddingsModel::Ptr m_embedding;
+        std::shared_ptr<ov::Core> m_core;
         // A tokenizer encoding a prompt.
         Tokenizer m_tokenizer;
         // Vision token processor for post-processing visual features (pruning, etc.)
@@ -249,7 +253,8 @@ private:
             const VLMConfig& vlm_config,
             const std::filesystem::path& model_dir,
             const std::string& device,
-            const ov::AnyMap device_config);
+            const ov::AnyMap device_config,
+            const std::shared_ptr<ov::Core>& core = nullptr);
 
         IInputsEmbedder(
             const VLMConfig& vlm_config,
@@ -257,7 +262,8 @@ private:
             const Tokenizer& tokenizer,
             const std::filesystem::path& config_dir_path,
             const std::string& device,
-            const ov::AnyMap device_config);
+            const ov::AnyMap device_config,
+            const std::shared_ptr<ov::Core>& core = nullptr);
 
         virtual ov::Tensor apply_chat_template_tokenize(const std::string& prompt, ov::genai::VLMPerfMetrics& metrics);
 
