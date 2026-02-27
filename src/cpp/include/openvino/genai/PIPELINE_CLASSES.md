@@ -51,12 +51,6 @@ classDiagram
     class WhisperPipelineImplBase {
         <<forward declared>>
     }
-    class StaticWhisperPipeline {
-        <<forward declared>>
-    }
-    class WhisperPipelineStatefulImpl {
-        <<forward declared>>
-    }
     WhisperPipeline *-- WhisperPipelineImplBase : has-a
 
     %% ──────────────── VLM ────────────────
@@ -64,12 +58,6 @@ classDiagram
         -unique_ptr~VLMPipelineBase~ m_pimpl
     }
     class VLMPipelineBase {
-        <<forward declared>>
-    }
-    class VLMPipelineImpl {
-        <<forward declared>>
-    }
-    class VLMContinuousBatchingAdapter {
         <<forward declared>>
     }
     VLMPipeline *-- VLMPipelineBase : has-a
