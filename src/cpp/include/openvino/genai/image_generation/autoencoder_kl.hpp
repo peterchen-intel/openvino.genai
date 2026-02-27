@@ -8,6 +8,7 @@
 #include <string>
 
 #include "openvino/core/any.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/runtime/tensor.hpp"
 #include "openvino/runtime/infer_request.hpp"
 #include "openvino/runtime/properties.hpp"
@@ -31,43 +32,51 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
-    explicit AutoencoderKL(const std::filesystem::path& vae_decoder_path);
+    explicit AutoencoderKL(const std::filesystem::path& vae_decoder_path,
+                           const std::shared_ptr<ov::Core>& core = {});
 
     AutoencoderKL(const std::filesystem::path& vae_encoder_path,
-                  const std::filesystem::path& vae_decoder_path);
+                  const std::filesystem::path& vae_decoder_path,
+                  const std::shared_ptr<ov::Core>& core = {});
 
     AutoencoderKL(const std::filesystem::path& vae_decoder_path,
                   const std::string& device,
-                  const ov::AnyMap& properties = {});
+                  const ov::AnyMap& properties = {},
+                  const std::shared_ptr<ov::Core>& core = {});
 
     AutoencoderKL(const std::filesystem::path& vae_encoder_path,
                   const std::filesystem::path& vae_decoder_path,
                   const std::string& device,
-                  const ov::AnyMap& properties = {});
-
-    AutoencoderKL(const std::string& vae_decoder_model,
-                  const Tensor& vae_decoder_weights,
-                  const Config& vae_decoder_config);
-
-    AutoencoderKL(const std::string& vae_encoder_model,
-                  const Tensor& vae_encoder_weights,
-                  const std::string& vae_decoder_model,
-                  const Tensor& vae_decoder_weights,
-                  const Config& vae_decoder_config);
+                  const ov::AnyMap& properties = {},
+                  const std::shared_ptr<ov::Core>& core = {});
 
     AutoencoderKL(const std::string& vae_decoder_model,
                   const Tensor& vae_decoder_weights,
                   const Config& vae_decoder_config,
-                  const std::string& device,
-                  const ov::AnyMap& properties = {});
+                  const std::shared_ptr<ov::Core>& core = {});
 
     AutoencoderKL(const std::string& vae_encoder_model,
                   const Tensor& vae_encoder_weights,
                   const std::string& vae_decoder_model,
                   const Tensor& vae_decoder_weights,
                   const Config& vae_decoder_config,
+                  const std::shared_ptr<ov::Core>& core = {});
+
+    AutoencoderKL(const std::string& vae_decoder_model,
+                  const Tensor& vae_decoder_weights,
+                  const Config& vae_decoder_config,
                   const std::string& device,
-                  const ov::AnyMap& properties = {});
+                  const ov::AnyMap& properties = {},
+                  const std::shared_ptr<ov::Core>& core = {});
+
+    AutoencoderKL(const std::string& vae_encoder_model,
+                  const Tensor& vae_encoder_weights,
+                  const std::string& vae_decoder_model,
+                  const Tensor& vae_decoder_weights,
+                  const Config& vae_decoder_config,
+                  const std::string& device,
+                  const ov::AnyMap& properties = {},
+                  const std::shared_ptr<ov::Core>& core = {});
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
@@ -150,6 +159,7 @@ private:
     void import_model(const std::filesystem::path& blob_path, const std::string& device, const ov::AnyMap& properties = {});
 
     Config m_config;
+    std::shared_ptr<ov::Core> m_core;
     ov::InferRequest m_encoder_request, m_decoder_request;
     std::shared_ptr<ov::Model> m_encoder_model = nullptr, m_decoder_model = nullptr;
 };

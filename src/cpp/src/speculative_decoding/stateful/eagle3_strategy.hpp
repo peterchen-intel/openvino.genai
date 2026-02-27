@@ -151,6 +151,7 @@ protected:
     std::string m_device;
     ov::AnyMap m_properties;
     ov::genai::Tokenizer m_tokenizer;
+    std::shared_ptr<ov::Core> m_core;
     mutable ov::InferRequest m_request;
     ov::genai::utils::KVAxesPosition m_kv_axes_pos;
     size_t m_max_prompt_len = 0;

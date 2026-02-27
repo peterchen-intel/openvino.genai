@@ -26,7 +26,7 @@ public:
         const std::string text_encoder = data["text_encoder"][1].get<std::string>();
         if (text_encoder == "CLIPTextModel") {
             m_clip_text_encoder =
-                std::make_shared<CLIPTextModel>(root_dir / "text_encoder");
+                std::make_shared<CLIPTextModel>(root_dir / "text_encoder", m_core);
         } else {
             OPENVINO_THROW("Unsupported '", text_encoder, "' text encoder type");
         }
@@ -34,14 +34,15 @@ public:
         const std::string text_encoder_2 = data["text_encoder_2"][1].get<std::string>();
         if (text_encoder_2 == "CLIPTextModelWithProjection") {
             m_clip_text_encoder_with_projection = std::make_shared<CLIPTextModelWithProjection>(
-                root_dir / "text_encoder_2");
+                root_dir / "text_encoder_2",
+                m_core);
         } else {
             OPENVINO_THROW("Unsupported '", text_encoder_2, "' text encoder type");
         }
 
         const std::string unet = data["unet"][1].get<std::string>();
         if (unet == "UNet2DConditionModel") {
-            m_unet = std::make_shared<UNet2DConditionModel>(root_dir / "unet");
+            m_unet = std::make_shared<UNet2DConditionModel>(root_dir / "unet", m_core);
         } else {
             OPENVINO_THROW("Unsupported '", unet, "' UNet type");
         }
@@ -49,11 +50,12 @@ public:
         const std::string vae = data["vae"][1].get<std::string>();
         if (vae == "AutoencoderKL") {
             if (m_pipeline_type == PipelineType::TEXT_2_IMAGE)
-                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder");
+                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder", m_core);
             else if (m_pipeline_type == PipelineType::IMAGE_2_IMAGE ||
                         m_pipeline_type == PipelineType::INPAINTING) {
                 m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_encoder",
-                                                        root_dir / "vae_decoder");
+                                                        root_dir / "vae_decoder",
+                                                        m_core);
             } else {
                 OPENVINO_ASSERT("Unsupported pipeline type");
             }
@@ -93,7 +95,8 @@ public:
             m_clip_text_encoder = std::make_shared<CLIPTextModel>(
                 root_dir / "text_encoder",
                 device,
-                *properties_for_text_encoder(*updated_properties, "lora_te1")
+                *properties_for_text_encoder(*updated_properties, "lora_te1"),
+                m_core
             );
             updated_properties.fork().erase(ov::genai::blob_path.name());
         } else {
@@ -108,7 +111,8 @@ public:
             m_clip_text_encoder_with_projection = std::make_shared<CLIPTextModelWithProjection>(
                 root_dir / "text_encoder_2",
                 device,
-                *properties_for_text_encoder(*updated_properties, "lora_te2")
+                *properties_for_text_encoder(*updated_properties, "lora_te2"),
+                m_core
             );
             updated_properties.fork().erase(ov::genai::blob_path.name());
         } else {
@@ -120,7 +124,7 @@ public:
             if (blob_path.has_value()) {
                 updated_properties.fork()[ov::genai::blob_path.name()] = blob_path.value() / "unet";
             }
-            m_unet = std::make_shared<UNet2DConditionModel>(root_dir / "unet", device, *updated_properties);
+            m_unet = std::make_shared<UNet2DConditionModel>(root_dir / "unet", device, *updated_properties, m_core);
             updated_properties.fork().erase(ov::genai::blob_path.name());
         } else {
             OPENVINO_THROW("Unsupported '", unet, "' UNet type");
@@ -138,9 +142,9 @@ public:
                 updated_properties.fork()[ov::genai::blob_path.name()] = blob_path.value();
             }
             if (m_pipeline_type == PipelineType::TEXT_2_IMAGE)
-                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder", device, *updated_properties);
+                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder", device, *updated_properties, m_core);
             else if (m_pipeline_type == PipelineType::IMAGE_2_IMAGE || m_pipeline_type == PipelineType::INPAINTING) {
-                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_encoder", root_dir / "vae_decoder", device, *updated_properties);
+                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_encoder", root_dir / "vae_decoder", device, *updated_properties, m_core);
             } else {
                 OPENVINO_ASSERT("Unsupported pipeline type");
             }

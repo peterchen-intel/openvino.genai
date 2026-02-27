@@ -65,8 +65,9 @@ InputsEmbedderLLaVA::InputsEmbedderLLaVA(
     const VLMConfig& vlm_config,
     const std::filesystem::path& model_dir,
     const std::string& device,
-    const ov::AnyMap device_config) :
-    IInputsEmbedder(vlm_config, model_dir, device, device_config) { }
+    const ov::AnyMap device_config,
+    const std::shared_ptr<ov::Core>& core) :
+    IInputsEmbedder(vlm_config, model_dir, device, device_config, core) { }
 
 InputsEmbedderLLaVA::InputsEmbedderLLaVA(
     const VLMConfig& vlm_config,
@@ -74,8 +75,9 @@ InputsEmbedderLLaVA::InputsEmbedderLLaVA(
     const Tokenizer& tokenizer,
     const std::filesystem::path& config_dir_path,
     const std::string& device,
-    const ov::AnyMap device_config) :
-    IInputsEmbedder(vlm_config, models_map, tokenizer, config_dir_path, device, device_config) { }
+    const ov::AnyMap device_config,
+    const std::shared_ptr<ov::Core>& core) :
+    IInputsEmbedder(vlm_config, models_map, tokenizer, config_dir_path, device, device_config, core) { }
 
 std::vector<ov::genai::EncodedImage> InputsEmbedderLLaVA::encode_images(const std::vector<ov::Tensor>& images) {
     std::vector<EncodedImage> embeds;

@@ -9,6 +9,7 @@
 #include <optional>
 
 #include <openvino/runtime/tensor.hpp>
+#include <openvino/runtime/core.hpp>
 
 #include "openvino/genai/scheduler_config.hpp"
 #include "openvino/genai/tokenizer.hpp"
@@ -80,6 +81,7 @@ protected:
     friend class PromptLookupImpl;
 
     std::shared_ptr<IContinuousBatchingPipeline> m_impl;
+    std::shared_ptr<ov::Core> m_core;
 
     ContinuousBatchingPipeline() = default;
 

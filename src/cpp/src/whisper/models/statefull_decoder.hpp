@@ -14,7 +14,8 @@ public:
                             const std::string& device,
                             const ov::AnyMap& properties,
                             const ov::PartialShape& lhs_shape,
-                            const bool decompose_cross_attention_spda_ops);
+                            const bool decompose_cross_attention_spda_ops,
+                            const std::shared_ptr<ov::Core>& core);
 
     void start_async(const Tensor& encoder_hidden_state, const Tensor& input_ids, const Tensor& beam_idx) override;
 
@@ -28,6 +29,7 @@ public:
         const std::vector<std::pair<size_t, size_t>>& alignment_heads) override;
 
 private:
+    std::shared_ptr<ov::Core> m_core;
     ov::InferRequest m_request;
     bool m_has_cache_position = true;
     void _set_cache_position_tensor(const size_t seq_len);

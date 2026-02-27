@@ -12,33 +12,47 @@
 namespace ov {
 namespace genai {
 
+namespace {
+
+std::shared_ptr<ov::Core> resolve_core(const std::shared_ptr<ov::Core>& core) {
+    return core ? core : std::make_shared<ov::Core>();
+}
+
+} // namespace
+
 std::filesystem::path get_tokenizer_path_by_text_encoder(const std::filesystem::path& text_encoder_path);
 
-T5EncoderModel::T5EncoderModel(const std::filesystem::path& root_dir) :
-    m_tokenizer(get_tokenizer_path_by_text_encoder(root_dir)) {
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+T5EncoderModel::T5EncoderModel(const std::filesystem::path& root_dir,
+                               const std::shared_ptr<ov::Core>& core)
+    : m_core(resolve_core(core)),
+      m_tokenizer(get_tokenizer_path_by_text_encoder(root_dir), m_core) {
+    m_model = m_core->read_model(root_dir / "openvino_model.xml");
 }
 
 T5EncoderModel::T5EncoderModel(const std::filesystem::path& root_dir,
-                             const std::string& device,
-                             const ov::AnyMap& properties) :
-    T5EncoderModel(root_dir) {
+                               const std::string& device,
+                               const ov::AnyMap& properties,
+                               const std::shared_ptr<ov::Core>& core)
+    : T5EncoderModel(root_dir, core) {
     compile(device, properties);
 }
 
 T5EncoderModel::T5EncoderModel(const std::string& model,
                                const Tensor& weights,
-                               const Tokenizer& tokenizer) :
-    m_tokenizer(tokenizer) {
-    m_model = utils::singleton_core().read_model(model, weights);
+                               const Tokenizer& tokenizer,
+                               const std::shared_ptr<ov::Core>& core)
+    : m_core(resolve_core(core)),
+      m_tokenizer(tokenizer) {
+    m_model = m_core->read_model(model, weights);
 }
 
 T5EncoderModel::T5EncoderModel(const std::string& model,
                                const Tensor& weights,
                                const Tokenizer& tokenizer,
                                const std::string& device,
-                               const ov::AnyMap& properties) :
-    T5EncoderModel(model, weights, tokenizer) {
+                               const ov::AnyMap& properties,
+                               const std::shared_ptr<ov::Core>& core)
+    : T5EncoderModel(model, weights, tokenizer, core) {
     compile(device, properties);
 }
 
@@ -72,7 +86,7 @@ T5EncoderModel& T5EncoderModel::reshape(int batch_size, int max_sequence_length)
 
 T5EncoderModel& T5EncoderModel::compile(const std::string& device, const ov::AnyMap& properties) {
     OPENVINO_ASSERT(m_model, "Model has been already compiled. Cannot re-compile already compiled model");
-    ov::CompiledModel compiled_model = utils::singleton_core().compile_model(m_model, device, *extract_adapters_from_properties(properties));
+    ov::CompiledModel compiled_model = m_core->compile_model(m_model, device, *extract_adapters_from_properties(properties));
     ov::genai::utils::print_compiled_model_properties(compiled_model, "T5 encoder model");
     m_request = compiled_model.create_infer_request();
     // release the original model

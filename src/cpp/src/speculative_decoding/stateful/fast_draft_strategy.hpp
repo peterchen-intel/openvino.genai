@@ -62,6 +62,7 @@ private:
     ov::AnyMap m_properties;
     ov::genai::GenerationConfig m_generation_config;
     ov::genai::Tokenizer m_tokenizer;
+    std::shared_ptr<ov::Core> m_core;
 
     std::size_t m_max_prompt_len = 0u;
     std::size_t m_kvcache_total = 0u;

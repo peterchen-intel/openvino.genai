@@ -4,11 +4,15 @@
 #include "continuous_batching/pipeline_base.hpp"
 #include "visual_language/chat_history_state.hpp"
 #include "visual_language/vlm_chat_context.hpp"
+#include "utils.hpp"
 
 namespace ov::genai {
 
 template<class... Ts> struct overloaded : Ts... {using Ts::operator()...;};
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+ContinuousBatchingPipeline::IContinuousBatchingPipeline::IContinuousBatchingPipeline(const std::shared_ptr<ov::Core>& core)
+    : m_core(core ? core : utils::create_core()) {}
 
 GenerationConfig ContinuousBatchingPipeline::IContinuousBatchingPipeline::get_config() const {
     return m_generation_config;
@@ -600,7 +604,7 @@ void ContinuousBatchingPipeline::IContinuousBatchingPipeline::stream_tokens(
 
 ContinuousBatchingPipeline::IContinuousBatchingPipeline::~IContinuousBatchingPipeline() {
     m_tokenizer = {};
-    utils::release_core_plugin(m_device);
+    m_core.reset();
 }
 
 }

@@ -32,19 +32,22 @@ struct ModelDesc {
     ov::genai::GenerationConfig generation_config;
     std::shared_ptr<ov::Model> model = nullptr;
     ov::genai::Tokenizer tokenizer;
+    std::shared_ptr<ov::Core> core = nullptr;
 
     ModelDesc(const std::shared_ptr<ov::Model>& model,
               const ov::genai::Tokenizer& tokenizer,
               const std::string& device = {},
               const ov::AnyMap& properties = {},
               const ov::genai::SchedulerConfig& scheduler_config = {},
-              const ov::genai::GenerationConfig& generation_config = {}) :
+              const ov::genai::GenerationConfig& generation_config = {},
+              const std::shared_ptr<ov::Core>& core = nullptr) :
         model(model),
         tokenizer(tokenizer),
         device(device),
         properties(properties),
         scheduler_config(scheduler_config),
-        generation_config(generation_config) {}
+        generation_config(generation_config),
+        core(core) {}
     
     ModelDesc() = default;
 };
@@ -133,13 +136,16 @@ void apply_slice_before_matmul_transformation(std::shared_ptr<ov::Model> model);
 void apply_gather_before_matmul_transformation(std::shared_ptr<ov::Model> model);
 
 ov::Core& singleton_core();
+std::shared_ptr<ov::Core> create_core();
 
 std::pair<ov::AnyMap, bool> extract_gguf_properties(const ov::AnyMap& external_properties);
 
 std::pair<ov::AnyMap, bool> extract_paired_input_props(const ov::AnyMap& external_properties);
 
+std::shared_ptr<ov::Model> read_model(ov::Core& core, const std::filesystem::path& model_dir, const ov::AnyMap& config);
 std::shared_ptr<ov::Model> read_model(const std::filesystem::path& model_dir,  const ov::AnyMap& config);
 
+void release_core_plugin(ov::Core& core, const std::string& device);
 void release_core_plugin(const std::string& device);
 
 size_t get_first_history_difference(const ov::Tensor& encoded_history, const std::vector<int64_t> tokenized_history);
@@ -191,14 +197,21 @@ struct KVDesc {
 };
 
 std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu(const std::shared_ptr<ov::Model>& model,
-                                                             const ov::AnyMap& config,
-                                                             const KVAxesPosition& kv_pos,
-                                                             const bool is_whisper = false);
+                                                              const ov::AnyMap& config,
+                                                              const KVAxesPosition& kv_pos,
+                                                              const bool is_whisper = false,
+                                                              const std::shared_ptr<ov::Core>& core = nullptr);
 
 std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_text_embedding(const std::shared_ptr<ov::Model>& model,
-                                                                            const ov::AnyMap& config,
-                                                                            const KVAxesPosition& kv_pos,
-                                                                            const ov::genai::TextEmbeddingPipeline::Config& text_embed_config);
+                                                                             const ov::AnyMap& config,
+                                                                             const KVAxesPosition& kv_pos,
+                                                                             const ov::genai::TextEmbeddingPipeline::Config& text_embed_config,
+                                                                             const std::shared_ptr<ov::Core>& core = nullptr);
+std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_text_embedding(const std::shared_ptr<ov::Model>& model,
+                                                                             const ov::AnyMap& config,
+                                                                             const KVAxesPosition& kv_pos,
+                                                                             const ov::genai::TextEmbeddingPipeline::Config& text_embed_config,
+                                                                             ov::Core& core);
 
 /// @brief SharedOptional is a wrapper around a reference to an existing object and an optional shared alternative value.
 /// The difference from std::optional is that the default state is not empty and contains a reference to an existing object outside the class.
@@ -306,7 +319,8 @@ std::pair<ov::AnyMap, std::optional<std::filesystem::path>> extract_export_prope
  */
 ov::CompiledModel import_model(const std::filesystem::path& blob_path,
                                const std::string& device,
-                               const ov::AnyMap& properties);
+                               const ov::AnyMap& properties,
+                               const std::shared_ptr<ov::Core>& core = nullptr);
 
 /**
  * @brief Exports a compiled model to a blob file for later use with import_model.

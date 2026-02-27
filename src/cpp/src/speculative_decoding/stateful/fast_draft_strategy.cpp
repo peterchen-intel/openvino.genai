@@ -51,17 +51,18 @@ namespace genai {
 ) : m_device(model_desc.device),
     m_properties(model_desc.properties),
     m_generation_config(model_desc.generation_config),
-    m_tokenizer(model_desc.tokenizer) {
+    m_tokenizer(model_desc.tokenizer),
+    m_core(model_desc.core ? model_desc.core : utils::create_core()) {
     m_kv_pos = ov::genai::utils::get_kv_axes_pos(model_desc.model);
     if (m_device == "NPU") {
-        auto [compiled, kv_desc] = utils::compile_decoder_for_npu(model_desc.model, m_properties, m_kv_pos);
+        auto [compiled, kv_desc] = utils::compile_decoder_for_npu(model_desc.model, m_properties, m_kv_pos, false, m_core);
         m_max_prompt_len = kv_desc.max_prompt_len;
         m_kvcache_total = kv_desc.max_prompt_len + kv_desc.min_response_len;
         m_request = compiled.create_infer_request();
     } else {
         // TODO: We might need it for manipulations with indices
         // utils::apply_gather_before_matmul_transformation(model_desc.model);
-        m_request = ov::genai::utils::singleton_core().compile_model(model_desc.model, m_device, m_properties).create_infer_request();
+        m_request = m_core->compile_model(model_desc.model, m_device, m_properties).create_infer_request();
     }
     raw_perf_metrics.m_inference_durations =  {{ ov::genai::MicroSeconds(0.0f) }};
 }

@@ -11,10 +11,13 @@ namespace ov {
 namespace genai {
 
 InferRequest create_text_embedding_npu_request(std::shared_ptr<ov::Model>& model,
+                                               const std::shared_ptr<ov::Core>& core,
                                                const TextEmbeddingPipeline::Config& config,
                                                const ov::AnyMap& properties,
                                                std::optional<size_t> max_position_embeddings,
                                                const bool is_seq_len_fixed) {
+    OPENVINO_ASSERT(core, "Text embedding NPU pipeline requires a valid ov::Core");
+
     if (config.batch_size.has_value() && is_seq_len_fixed) {
         utils::reshape_model(model, config, max_position_embeddings);
     }
@@ -31,22 +34,23 @@ InferRequest create_text_embedding_npu_request(std::shared_ptr<ov::Model>& model
         auto kv_pos = utils::get_kv_axes_pos(model);
         utils::KVDesc kv_desc;
         std::tie(compiled_model, kv_desc) =
-            utils::compile_decoder_for_npu_text_embedding(model, properties, kv_pos, config);
+            utils::compile_decoder_for_npu_text_embedding(model, properties, kv_pos, config, *core);
     } else {
-        ov::Core core = utils::singleton_core();
         model = utils::apply_postprocessing(model, config);
-        compiled_model = core.compile_model(model, "NPU", properties);
+        compiled_model = core->compile_model(model, "NPU", properties);
     }
     utils::print_compiled_model_properties(compiled_model, "npu text embedding model");
     return compiled_model.create_infer_request();
 }
 
 InferRequest create_text_embedding_npu_post_request(std::shared_ptr<ov::Model>& model,
+                                                    const std::shared_ptr<ov::Core>& core,
                                                     const TextEmbeddingPipeline::Config& config) {
+    OPENVINO_ASSERT(core, "Text embedding NPU pipeline requires a valid ov::Core");
+
     if (model->is_dynamic()) {
-        ov::Core core = utils::singleton_core();
         auto post_model = utils::create_post_model(model, config);
-        auto post_compiled_model = core.compile_model(post_model, "CPU");
+        auto post_compiled_model = core->compile_model(post_model, "CPU");
         return post_compiled_model.create_infer_request();
     } else {
         return InferRequest{};

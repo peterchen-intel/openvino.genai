@@ -6,18 +6,22 @@
 #include <memory>
 
 #include "openvino/core/model.hpp"
+#include "openvino/core/preprocess/pre_post_process.hpp"
 #include "openvino/op/parameter.hpp"
 #include "openvino/op/result.hpp"
+#include "openvino/op/constant.hpp"
 #include "openvino/op/convert.hpp"
 #include "openvino/op/greater_eq.hpp"
 #include "openvino/op/select.hpp"
-
-#include "utils.hpp" // for utils::singleton_core
 
 namespace ov {
 namespace genai {
 
 namespace {
+
+std::shared_ptr<ov::Core> resolve_core(const std::shared_ptr<ov::Core>& core) {
+    return core ? core : std::make_shared<ov::Core>();
+}
 
 std::shared_ptr<ov::Model> create_empty_model(ov::element::Type type = ov::element::f32) {
     auto parameter = std::make_shared<ov::op::v0::Parameter>(type, ov::PartialShape::dynamic(4));
@@ -27,8 +31,10 @@ std::shared_ptr<ov::Model> create_empty_model(ov::element::Type type = ov::eleme
 
 } // namespace
 
-IImageProcessor::IImageProcessor(const std::string& device) :
-    m_device(device) {
+IImageProcessor::IImageProcessor(const std::string& device,
+                                 const std::shared_ptr<ov::Core>& core)
+    : m_core(resolve_core(core)),
+      m_device(device) {
 }
 
 ov::Tensor IImageProcessor::execute(ov::Tensor image) {
@@ -39,11 +45,15 @@ ov::Tensor IImageProcessor::execute(ov::Tensor image) {
 }
 
 void IImageProcessor::compile(std::shared_ptr<ov::Model> model) {
-    m_request = utils::singleton_core().compile_model(model, m_device).create_infer_request();
+    m_request = m_core->compile_model(model, m_device).create_infer_request();
 }
 
-ImageProcessor::ImageProcessor(const std::string& device, bool do_normalize, bool do_binarize, bool gray_scale_source) :
-    IImageProcessor(device) {
+ImageProcessor::ImageProcessor(const std::string& device,
+                               bool do_normalize,
+                               bool do_binarize,
+                               bool gray_scale_source,
+                               const std::shared_ptr<ov::Core>& core)
+    : IImageProcessor(device, core) {
     auto image_processor_model = create_empty_model();
     merge_image_preprocessing(image_processor_model, do_normalize, do_binarize, gray_scale_source);
 
@@ -90,7 +100,12 @@ void ImageProcessor::merge_image_preprocessing(std::shared_ptr<ov::Model> model,
     ppp.build();
 }
 
-ImageResizer::ImageResizer(const std::string& device, ov::element::Type type, ov::Layout layout, ov::op::v11::Interpolate::InterpolateMode interpolation_mode) {
+ImageResizer::ImageResizer(const std::string& device,
+                           ov::element::Type type,
+                           ov::Layout layout,
+                           ov::op::v11::Interpolate::InterpolateMode interpolation_mode,
+                           const std::shared_ptr<ov::Core>& core)
+    : m_core(resolve_core(core)) {
     auto image_parameter = std::make_shared<ov::op::v0::Parameter>(type, ov::PartialShape::dynamic(4));
     image_parameter->get_output_tensor(0).add_names({"image"});
 
@@ -121,7 +136,7 @@ ImageResizer::ImageResizer(const std::string& device, ov::element::Type type, ov
     auto result = std::make_shared<ov::op::v0::Result>(interp);
     auto resize_model = std::make_shared<ov::Model>(ov::ResultVector{result}, ov::ParameterVector{image_parameter, target_spatial_shape});
 
-    m_request = utils::singleton_core().compile_model(resize_model, device).create_infer_request();
+    m_request = m_core->compile_model(resize_model, device).create_infer_request();
 }
 
 ov::Tensor ImageResizer::execute(ov::Tensor image, int64_t dst_height, int64_t dst_width) {

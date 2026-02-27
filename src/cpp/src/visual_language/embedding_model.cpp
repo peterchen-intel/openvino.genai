@@ -35,6 +35,14 @@ std::unique_ptr<ov::genai::CircularBufferQueue<ov::genai::EmbeddingsRequest>> in
     return embeddings_requests_queue;
 }
 
+std::shared_ptr<ov::Core> get_core(const std::shared_ptr<ov::Core>& core) {
+    if (core) {
+        return core;
+    }
+    static auto singleton_core = std::shared_ptr<ov::Core>(&ov::genai::utils::singleton_core(), [](ov::Core*) {});
+    return singleton_core;
+}
+
 }  // namespace
 
 namespace ov {
@@ -43,13 +51,14 @@ namespace genai {
 EmbeddingsModel::EmbeddingsModel(const std::filesystem::path& model_dir,
                                  const float scale_emb,
                                  const std::string& device,
-                                 const ov::AnyMap& properties) {
-    ov::Core core = utils::singleton_core();
-    std::shared_ptr<ov::Model> m_model = core.read_model(model_dir / "openvino_text_embeddings_model.xml", {}, properties);
+                                 const ov::AnyMap& properties,
+                                 const std::shared_ptr<ov::Core>& core) {
+    auto core_ptr = get_core(core);
+    std::shared_ptr<ov::Model> m_model = core_ptr->read_model(model_dir / "openvino_text_embeddings_model.xml", {}, properties);
     // apply embedding postprocessing step by merging them into the model
     merge_postprocess(m_model, scale_emb);
 
-    ov::CompiledModel compiled_model = core.compile_model(m_model, device, properties);
+    ov::CompiledModel compiled_model = core_ptr->compile_model(m_model, device, properties);
     ov::genai::utils::print_compiled_model_properties(compiled_model, "text embeddings model");
     m_embeddings_requests_queue = init(compiled_model);
 }
@@ -58,13 +67,14 @@ EmbeddingsModel::EmbeddingsModel(const std::string& model,
                                  const ov::Tensor& weights,
                                  const float scale_emb,
                                  const std::string& device,
-                                 const ov::AnyMap& properties) {
-    ov::Core core = utils::singleton_core();
-    std::shared_ptr<ov::Model> m_model = core.read_model(model, weights);
+                                 const ov::AnyMap& properties,
+                                 const std::shared_ptr<ov::Core>& core) {
+    auto core_ptr = get_core(core);
+    std::shared_ptr<ov::Model> m_model = core_ptr->read_model(model, weights);
     // apply embedding postprocessing step by merging them into the model
     merge_postprocess(m_model, scale_emb);
 
-    ov::CompiledModel compiled_model = core.compile_model(m_model, device, properties);
+    ov::CompiledModel compiled_model = core_ptr->compile_model(m_model, device, properties);
     m_embeddings_requests_queue = init(compiled_model);
 }
 

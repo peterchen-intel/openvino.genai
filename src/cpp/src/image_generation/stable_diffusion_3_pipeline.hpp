@@ -80,14 +80,14 @@ public:
 
         const std::string text_encoder = data["text_encoder"][1].get<std::string>();
         if (text_encoder == "CLIPTextModelWithProjection") {
-            m_clip_text_encoder_1 = std::make_shared<CLIPTextModelWithProjection>(root_dir / "text_encoder");
+            m_clip_text_encoder_1 = std::make_shared<CLIPTextModelWithProjection>(root_dir / "text_encoder", m_core);
         } else {
             OPENVINO_THROW("Unsupported '", text_encoder, "' text encoder type");
         }
 
         const std::string text_encoder_2 = data["text_encoder_2"][1].get<std::string>();
         if (text_encoder_2 == "CLIPTextModelWithProjection") {
-            m_clip_text_encoder_2 = std::make_shared<CLIPTextModelWithProjection>(root_dir / "text_encoder_2");
+            m_clip_text_encoder_2 = std::make_shared<CLIPTextModelWithProjection>(root_dir / "text_encoder_2", m_core);
         } else {
             OPENVINO_THROW("Unsupported '", text_encoder_2, "' text encoder type");
         }
@@ -96,7 +96,7 @@ public:
         if (!text_encoder_3_json.is_null()) {
             const std::string text_encoder_3 = text_encoder_3_json.get<std::string>();
             if (text_encoder_3 == "T5EncoderModel") {
-                m_t5_text_encoder = std::make_shared<T5EncoderModel>(root_dir / "text_encoder_3");
+                m_t5_text_encoder = std::make_shared<T5EncoderModel>(root_dir / "text_encoder_3", m_core);
             } else {
                 OPENVINO_THROW("Unsupported '", text_encoder_3, "' text encoder type");
             }
@@ -104,7 +104,7 @@ public:
 
         const std::string transformer = data["transformer"][1].get<std::string>();
         if (transformer == "SD3Transformer2DModel") {
-            m_transformer = std::make_shared<SD3Transformer2DModel>(root_dir / "transformer");
+            m_transformer = std::make_shared<SD3Transformer2DModel>(root_dir / "transformer", m_core);
         } else {
             OPENVINO_THROW("Unsupported '", transformer, "' Transformer type");
         }
@@ -112,9 +112,9 @@ public:
         const std::string vae = data["vae"][1].get<std::string>();
         if (vae == "AutoencoderKL") {
             if (m_pipeline_type == PipelineType::TEXT_2_IMAGE)
-                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder");
+                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder", m_core);
             else if (m_pipeline_type == PipelineType::IMAGE_2_IMAGE || m_pipeline_type == PipelineType::INPAINTING) {
-                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_encoder", root_dir / "vae_decoder");
+                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_encoder", root_dir / "vae_decoder", m_core);
             } else {
                 OPENVINO_ASSERT("Unsupported pipeline type");
             }
@@ -143,13 +143,13 @@ public:
         const std::string text_encoder = data["text_encoder"][1].get<std::string>();
         if (text_encoder == "CLIPTextModelWithProjection") {
             m_clip_text_encoder_1 =
-                std::make_shared<CLIPTextModelWithProjection>(root_dir / "text_encoder", device, properties);
+                std::make_shared<CLIPTextModelWithProjection>(root_dir / "text_encoder", device, properties, m_core);
         } else {
             OPENVINO_THROW("Unsupported '", text_encoder, "' text encoder type");
         }
         const std::string text_encoder_2 = data["text_encoder_2"][1].get<std::string>();
         if (text_encoder_2 == "CLIPTextModelWithProjection") {
-            m_clip_text_encoder_2 = std::make_shared<CLIPTextModelWithProjection>(root_dir / "text_encoder_2", device, properties);
+            m_clip_text_encoder_2 = std::make_shared<CLIPTextModelWithProjection>(root_dir / "text_encoder_2", device, properties, m_core);
         } else {
             OPENVINO_THROW("Unsupported '", text_encoder_2, "' text encoder type");
         }
@@ -157,14 +157,14 @@ public:
         if (!text_encoder_3_json.is_null()) {
             const std::string text_encoder_3 = text_encoder_3_json.get<std::string>();
             if (text_encoder_3 == "T5EncoderModel") {
-                m_t5_text_encoder = std::make_shared<T5EncoderModel>(root_dir / "text_encoder_3", device, properties);
+                m_t5_text_encoder = std::make_shared<T5EncoderModel>(root_dir / "text_encoder_3", device, properties, m_core);
             } else {
                 OPENVINO_THROW("Unsupported '", text_encoder_3, "' text encoder type");
             }
         }
         const std::string transformer = data["transformer"][1].get<std::string>();
         if (transformer == "SD3Transformer2DModel") {
-            m_transformer = std::make_shared<SD3Transformer2DModel>(root_dir / "transformer", device, properties);
+            m_transformer = std::make_shared<SD3Transformer2DModel>(root_dir / "transformer", device, properties, m_core);
         } else {
             OPENVINO_THROW("Unsupported '", transformer, "' Transformer type");
         }
@@ -172,9 +172,9 @@ public:
         const std::string vae = data["vae"][1].get<std::string>();
         if (vae == "AutoencoderKL") {
             if (m_pipeline_type == PipelineType::TEXT_2_IMAGE)
-                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder", device, properties);
+                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_decoder", device, properties, m_core);
             else if (m_pipeline_type == PipelineType::IMAGE_2_IMAGE || m_pipeline_type == PipelineType::INPAINTING) {
-                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_encoder", root_dir / "vae_decoder", device, properties);
+                m_vae = std::make_shared<AutoencoderKL>(root_dir / "vae_encoder", root_dir / "vae_decoder", device, properties, m_core);
             } else {
                 OPENVINO_ASSERT("Unsupported pipeline type");
             }

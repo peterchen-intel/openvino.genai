@@ -19,9 +19,10 @@ public:
     }
 
     virtual void compile(std::shared_ptr<ov::Model> model,
+                         const std::shared_ptr<ov::Core>& core,
                          const std::string& device,
                          const ov::AnyMap& properties) override {
-        ov::CompiledModel compiled_model = utils::singleton_core().compile_model(model, device, properties);
+        ov::CompiledModel compiled_model = core->compile_model(model, device, properties);
         ov::genai::utils::print_compiled_model_properties(compiled_model, "SD3 Transformer 2D model");
         m_request = compiled_model.create_infer_request();
     }

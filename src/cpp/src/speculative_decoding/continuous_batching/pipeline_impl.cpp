@@ -11,7 +11,8 @@ ContinuousBatchingPipeline::ContinuousBatchingForSpeculativeDecodingImpl::Contin
     const SchedulerConfig& scheduler_config,
     const std::string& device,
     const ov::AnyMap& plugin_config,
-    bool is_validation_mode_enabled) {
+    bool is_validation_mode_enabled,
+    const std::shared_ptr<ov::Core>& core) {
     m_tokenizer = tokenizer;
     m_generation_config = generation_config;
     if (m_generation_config.assistant_confidence_threshold == 0.f) {
@@ -20,6 +21,9 @@ ContinuousBatchingPipeline::ContinuousBatchingForSpeculativeDecodingImpl::Contin
         }
     }
     m_is_validation_mode_enabled = is_validation_mode_enabled;
+    if (core) {
+        m_core = core;
+    }
     initialize_pipeline(model, scheduler_config, device, plugin_config);
 }
 

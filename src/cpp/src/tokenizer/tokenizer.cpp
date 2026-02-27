@@ -21,25 +21,43 @@ Tokenizer::Tokenizer(const std::filesystem::path& tokenizer_path, const ov::AnyM
     m_pimpl = std::make_shared<Tokenizer::TokenizerImpl>(tokenizer_path, properties);
 }
 
+Tokenizer::Tokenizer(const std::filesystem::path& tokenizer_path, const std::shared_ptr<ov::Core>& core, const ov::AnyMap& properties) {
+    m_pimpl = std::make_shared<Tokenizer::TokenizerImpl>(tokenizer_path, properties, core);
+}
+
 Tokenizer::Tokenizer(
     const std::string& tokenizer_model_str,
     const ov::Tensor& tokenizer_weights_tensor,
     const std::string& detokenizer_model_str,
     const ov::Tensor&  detokenizer_weights_tensor,
-    const ov::AnyMap& properties
-) {
+    const ov::AnyMap& properties) {
     ScopedVar env_manager(tokenizers_relative_to_genai());
     auto core = get_core_singleton();
 
-    auto ov_tokenizer = core.read_model(tokenizer_model_str, tokenizer_weights_tensor);
-    auto ov_detokenizer = core.read_model(detokenizer_model_str, detokenizer_weights_tensor);
+    auto ov_tokenizer = core->read_model(tokenizer_model_str, tokenizer_weights_tensor);
+    auto ov_detokenizer = core->read_model(detokenizer_model_str, detokenizer_weights_tensor);
     m_pimpl = std::make_shared<Tokenizer::TokenizerImpl>(std::make_pair(ov_tokenizer, ov_detokenizer), properties);
+}
+
+Tokenizer::Tokenizer(
+    const std::string& tokenizer_model_str,
+    const ov::Tensor& tokenizer_weights_tensor,
+    const std::string& detokenizer_model_str,
+    const ov::Tensor& detokenizer_weights_tensor,
+    const std::shared_ptr<ov::Core>& core,
+    const ov::AnyMap& properties) {
+    ScopedVar env_manager(tokenizers_relative_to_genai());
+    OPENVINO_ASSERT(core, "Tokenizer requires a valid ov::Core");
+
+    auto ov_tokenizer = core->read_model(tokenizer_model_str, tokenizer_weights_tensor);
+    auto ov_detokenizer = core->read_model(detokenizer_model_str, detokenizer_weights_tensor);
+    m_pimpl = std::make_shared<Tokenizer::TokenizerImpl>(std::make_pair(ov_tokenizer, ov_detokenizer), properties, core);
 }
 
 Tokenizer::Tokenizer(const std::string& model_str, ov::Tensor& weights_tensor, const ov::AnyMap& properties) {
     ScopedVar env_manager(tokenizers_relative_to_genai());
     auto core = get_core_singleton();
-    auto model = core.read_model(model_str, weights_tensor);
+    auto model = core->read_model(model_str, weights_tensor);
 
     auto parameters = model->get_parameters();
     OPENVINO_ASSERT(!parameters.empty());
@@ -49,6 +67,22 @@ Tokenizer::Tokenizer(const std::string& model_str, ov::Tensor& weights_tensor, c
     } else {
         // It's a detokenizer
         m_pimpl = std::make_shared<Tokenizer::TokenizerImpl>(std::make_pair(nullptr, model), properties);
+    }
+}
+
+Tokenizer::Tokenizer(const std::string& model_str, ov::Tensor& weights_tensor, const std::shared_ptr<ov::Core>& core, const ov::AnyMap& properties) {
+    ScopedVar env_manager(tokenizers_relative_to_genai());
+    OPENVINO_ASSERT(core, "Tokenizer requires a valid ov::Core");
+    auto model = core->read_model(model_str, weights_tensor);
+
+    auto parameters = model->get_parameters();
+    OPENVINO_ASSERT(!parameters.empty());
+    if (parameters.front()->get_element_type() == ov::element::string) {
+        // It's a tokenizer
+        m_pimpl = std::make_shared<Tokenizer::TokenizerImpl>(std::make_pair(model, nullptr), properties, core);
+    } else {
+        // It's a detokenizer
+        m_pimpl = std::make_shared<Tokenizer::TokenizerImpl>(std::make_pair(nullptr, model), properties, core);
     }
 }
 
@@ -173,14 +207,18 @@ bool Tokenizer::supports_paired_input() const {
 }
 
 Tokenizer::~Tokenizer() {
+    const bool unload_singleton_core = m_pimpl && m_pimpl->m_uses_core_singleton;
+    auto core = unload_singleton_core ? m_pimpl->m_core : nullptr;
     m_pimpl.reset();
 
-    // release CPU plugin ()
-    try {
-        get_core_singleton().unload_plugin("CPU");
-    } catch (const ov::Exception&) {
-        // Note: in a theory it can throw an exception when 2 different Tokenizers are created from
-        // different threads and then both of them unload plugin for 'device' from ov::Core
+    // release CPU plugin
+    if (unload_singleton_core && core) {
+        try {
+            core->unload_plugin("CPU");
+        } catch (const ov::Exception&) {
+            // Note: in a theory it can throw an exception when 2 different Tokenizers are created from
+            // different threads and then both of them unload plugin for 'device' from ov::Core
+        }
     }
 }
 

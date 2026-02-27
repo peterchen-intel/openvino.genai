@@ -14,6 +14,7 @@ namespace genai {
 class WhisperPipeline::WhisperPipelineImplBase {
 public:
     WhisperGenerationConfig m_generation_config;
+    std::shared_ptr<ov::Core> m_core;
     Tokenizer m_tokenizer;
     WhisperFeatureExtractor m_feature_extractor;
     WhisperConfig m_model_config;
@@ -22,7 +23,8 @@ public:
 
     WhisperPipelineImplBase(const std::filesystem::path& models_path)
         : m_generation_config(utils::from_config_json_if_exists<WhisperGenerationConfig>(models_path)),
-          m_tokenizer{models_path},
+          m_core(utils::create_core()),
+          m_tokenizer{models_path, m_core},
           m_feature_extractor{models_path / "preprocessor_config.json"},
           m_model_config{models_path / "config.json"} {}
 

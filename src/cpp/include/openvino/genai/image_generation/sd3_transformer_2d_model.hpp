@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "openvino/core/any.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/runtime/infer_request.hpp"
 #include "openvino/runtime/properties.hpp"
 #include "openvino/runtime/tensor.hpp"
@@ -28,23 +29,27 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
-    explicit SD3Transformer2DModel(const std::filesystem::path& root_dir);
+    explicit SD3Transformer2DModel(const std::filesystem::path& root_dir,
+                                   const std::shared_ptr<ov::Core>& core = {});
 
     SD3Transformer2DModel(const std::filesystem::path& root_dir,
                           const std::string& device,
-                          const ov::AnyMap& properties = {});
+                          const ov::AnyMap& properties = {},
+                          const std::shared_ptr<ov::Core>& core = {});
 
     SD3Transformer2DModel(const std::string& model,
                           const Tensor& weights,
                           const Config& config,
-                          const size_t vae_scale_factor);
+                          const size_t vae_scale_factor,
+                          const std::shared_ptr<ov::Core>& core = {});
 
     SD3Transformer2DModel(const std::string& model,
                           const Tensor& weights,
                           const Config& config,
                           const size_t vae_scale_factor,
                           const std::string& device,
-                          const ov::AnyMap& properties = {});
+                          const ov::AnyMap& properties = {},
+                          const std::shared_ptr<ov::Core>& core = {});
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
@@ -89,6 +94,7 @@ private:
 
     Config m_config;
     ov::InferRequest m_request;
+    std::shared_ptr<ov::Core> m_core;
     std::shared_ptr<ov::Model> m_model;
     size_t m_vae_scale_factor;
     AdapterController m_adapter_controller;

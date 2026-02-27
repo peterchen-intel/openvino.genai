@@ -346,6 +346,7 @@ public:
 
 private:
     std::string m_device;
+    std::shared_ptr<ov::Core> m_core;
     std::unique_ptr<LLMPipelineImplBase> m_pimpl;
 };
 

@@ -52,6 +52,10 @@ std::optional<size_t> read_max_position_embeddings(const std::filesystem::path& 
     return max_position_embeddings;
 }
 
+std::shared_ptr<ov::Core> create_text_embedding_core() {
+    return utils::create_core();
+}
+
 }  // namespace
 
 namespace ov {
@@ -85,14 +89,13 @@ public:
                               const std::string& device,
                               const Config& config,
                               const ov::AnyMap& properties = {})
-        : m_config{config},
-          m_tokenizer{models_path},
+        : m_core{create_text_embedding_core()},
+          m_config{config},
+          m_tokenizer{models_path, m_core},
           m_max_position_embeddings{read_max_position_embeddings(models_path)} {
         m_config.validate();
 
-        ov::Core core = utils::singleton_core();
-
-        auto model = core.read_model(models_path / "openvino_model.xml", {}, properties);
+        auto model = m_core->read_model(models_path / "openvino_model.xml", {}, properties);
 
         bool is_seq_len_fixed = true;
         if (m_config.max_length) {
@@ -114,17 +117,18 @@ public:
 
         if (device == "NPU") {
             m_request = create_text_embedding_npu_request(model,
+                                                          m_core,
                                                           m_config,
                                                           properties,
                                                           m_max_position_embeddings,
                                                           is_seq_len_fixed);
-            m_post_request = create_text_embedding_npu_post_request(model, m_config);
+            m_post_request = create_text_embedding_npu_post_request(model, m_core, m_config);
         } else {
             if (m_config.batch_size.has_value() || m_config.max_length.has_value()) {
                 utils::reshape_model(model, m_config, m_max_position_embeddings);
             }
             model = utils::apply_postprocessing(model, m_config);
-            auto compiled_model = core.compile_model(model, device, properties);
+            auto compiled_model = m_core->compile_model(model, device, properties);
             utils::print_compiled_model_properties(compiled_model, "text embedding model");
             m_request = compiled_model.create_infer_request();
         }
@@ -167,6 +171,7 @@ public:
     };
 
 private:
+    std::shared_ptr<ov::Core> m_core;
     Tokenizer m_tokenizer;
     InferRequest m_request;
     InferRequest m_post_request;

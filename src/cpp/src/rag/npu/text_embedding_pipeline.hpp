@@ -4,18 +4,21 @@
 #pragma once
 
 #include "openvino/genai/rag/text_embedding_pipeline.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/runtime/infer_request.hpp"
 
 namespace ov {
 namespace genai {
 
 InferRequest create_text_embedding_npu_request(std::shared_ptr<ov::Model>& model,
+                                               const std::shared_ptr<ov::Core>& core,
                                                const TextEmbeddingPipeline::Config& config,
                                                const ov::AnyMap& properties,
                                                std::optional<size_t> max_position_embeddings,
                                                const bool is_seq_len_fixed);
 
 InferRequest create_text_embedding_npu_post_request(std::shared_ptr<ov::Model>& model,
+                                                    const std::shared_ptr<ov::Core>& core,
                                                     const TextEmbeddingPipeline::Config& config);
 
 }  // namespace genai

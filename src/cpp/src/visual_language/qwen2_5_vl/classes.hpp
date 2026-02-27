@@ -24,7 +24,8 @@ public:
         const VLMConfig& vlm_config,
         const std::filesystem::path& model_dir,
         const std::string& device,
-        const ov::AnyMap device_config);
+        const ov::AnyMap device_config,
+        const std::shared_ptr<ov::Core>& core = nullptr);
 
     InputsEmbedderQwen2_5_VL(
         const VLMConfig& vlm_config,
@@ -32,7 +33,8 @@ public:
         const Tokenizer& tokenizer, 
         const std::filesystem::path& config_dir_path,
         const std::string& device,
-        const ov::AnyMap device_config);
+        const ov::AnyMap device_config,
+        const std::shared_ptr<ov::Core>& core = nullptr);
 
 protected:
     std::pair<ov::Tensor, ov::Tensor> run_video_image_embeddings_merger(

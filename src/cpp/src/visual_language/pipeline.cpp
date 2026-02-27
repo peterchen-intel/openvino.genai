@@ -27,6 +27,11 @@
 using namespace ov::genai;
 
 namespace {
+
+std::shared_ptr<ov::Core> create_vlm_core() {
+    return utils::create_core();
+}
+
 void update_npu_properties(const std::filesystem::path& models_dir, ov::AnyMap& properties) {
     auto vlm_config = utils::from_config_json_if_exists<VLMConfig>(models_dir, "config.json");
     switch (vlm_config.model_type) {
@@ -48,6 +53,7 @@ void npu_auto_default_properties(ov::AnyMap& device_properties) {
 }
 
 class VLMPipeline::VLMPipelineImpl : public VLMPipelineBase{
+    std::shared_ptr<ov::Core> m_core;
     // A config to follow for text generation.
     GenerationConfig m_generation_config;
     // A tokenizer encoding a prompt.
@@ -86,6 +92,7 @@ public:
         const std::string& device,
         const ov::AnyMap& properties
     ) :
+        m_core(create_vlm_core()),
         m_generation_config{
             utils::from_config_json_if_exists<GenerationConfig>(
                 models_dir, "generation_config.json"
@@ -95,7 +102,7 @@ public:
 
         auto properties_copy = properties;
         auto language_model_path = models_dir / "openvino_language_model.xml";
-        auto language_model =  utils::singleton_core().read_model(language_model_path, {}, properties_copy);
+        auto language_model =  m_core->read_model(language_model_path, {}, properties_copy);
         auto kv_pos = ov::genai::utils::get_kv_axes_pos(language_model);
 
         // In case user provided properties per-device
@@ -122,7 +129,7 @@ public:
             m_max_kv_cache_size = kv_desc.max_prompt_len + kv_desc.min_response_len;
             npu_auto_default_properties(device_properties);
         } else {
-            compiled_language_model = utils::singleton_core().compile_model(language_model, device, lm_properties);
+            compiled_language_model = m_core->compile_model(language_model, device, lm_properties);
         }
         ov::genai::utils::print_compiled_model_properties(compiled_language_model, "VLM language model");
 
@@ -133,7 +140,7 @@ public:
             ? properties_copy
             : utils::pop_or_default<ov::AnyMap>(device_properties, embedder_device, {});
 
-        m_inputs_embedder = std::make_shared<InputsEmbedder>(models_dir, embedder_device, embedder_properties);
+        m_inputs_embedder = std::make_shared<InputsEmbedder>(models_dir, embedder_device, embedder_properties, m_core);
         m_tokenizer = m_inputs_embedder->get_tokenizer();
         m_embedding = m_inputs_embedder->get_embedding_model();
         // NPU is not supporting history, so in chat scenarios let's use full chat history on each iteration
@@ -162,18 +169,19 @@ public:
         const ov::AnyMap& properties,
         const GenerationConfig& generation_config
     ) :
+        m_core(create_vlm_core()),
         m_generation_config{generation_config} {
         m_is_npu = device.find("NPU") != std::string::npos;
         OPENVINO_ASSERT(!m_is_npu,
             "VLMPipeline initialization from string isn't supported for NPU device");
 
-        m_inputs_embedder = std::make_shared<InputsEmbedder>(models_map, tokenizer, config_dir_path, device, properties);
+        m_inputs_embedder = std::make_shared<InputsEmbedder>(models_map, tokenizer, config_dir_path, device, properties, m_core);
 
         m_tokenizer = m_inputs_embedder->get_tokenizer();
         m_embedding = m_inputs_embedder->get_embedding_model();
 
         auto m_language_pair = utils::get_model_weights_pair(models_map, "language");
-        m_language = utils::singleton_core().compile_model(
+        m_language = m_core->compile_model(
             m_language_pair.first, m_language_pair.second, device, properties
         ).create_infer_request();
 
