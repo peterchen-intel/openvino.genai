@@ -27,7 +27,7 @@ FluxTransformer2DModel::Config::Config(const std::filesystem::path& config_path)
 
 FluxTransformer2DModel::FluxTransformer2DModel(const std::filesystem::path& root_dir)
     : m_config(root_dir / "config.json") {
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+    m_model = ov::Core{}.read_model(root_dir / "openvino_model.xml");
     m_vae_scale_factor = ov::genai::get_vae_scale_factor(root_dir.parent_path() / "vae_decoder" / "config.json");
 }
 
@@ -43,7 +43,7 @@ FluxTransformer2DModel::FluxTransformer2DModel(const std::string& model,
                                                const Config& config,
                                                const size_t vae_scale_factor) :
     m_config(config), m_vae_scale_factor(vae_scale_factor) {
-    m_model = utils::singleton_core().read_model(model, weights);
+    m_model = ov::Core{}.read_model(model, weights);
 }
 
 FluxTransformer2DModel::FluxTransformer2DModel(const std::string& model,
@@ -127,7 +127,7 @@ FluxTransformer2DModel& FluxTransformer2DModel::compile(const std::string& devic
         adapters->set_tensor_name_prefix(adapters->get_tensor_name_prefix().value_or("transformer"));
         m_adapter_controller = AdapterController(m_model, *adapters, device);
     }
-    ov::CompiledModel compiled_model = utils::singleton_core().compile_model(m_model, device, *filtered_properties);
+    ov::CompiledModel compiled_model = ov::Core{}.compile_model(m_model, device, *filtered_properties);
     ov::genai::utils::print_compiled_model_properties(compiled_model, "Flux Transformer 2D model");
     m_request = compiled_model.create_infer_request();
     // release the original model

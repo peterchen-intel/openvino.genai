@@ -1036,9 +1036,7 @@ WhisperPipeline::StaticWhisperPipeline::StaticWhisperPipeline(const std::filesys
     m_generation_config.update_generation_config(properties_copy);
     erase_whisper_generation_config_keys(properties_copy);
     
-    ov::Core core = utils::singleton_core();
-
-    auto encoder_model = core.read_model(models_path / "openvino_encoder_model.xml", {}, properties_copy);
+    auto encoder_model = m_ov_core.read_model(models_path / "openvino_encoder_model.xml", {}, properties_copy);
     reshape_to_static_encoder(encoder_model, m_feature_extractor.feature_size);
     auto last_hidden_state_shape = get_encoder_hidden_state_shape(encoder_model);
 
@@ -1046,10 +1044,10 @@ WhisperPipeline::StaticWhisperPipeline::StaticWhisperPipeline(const std::filesys
     std::shared_ptr<ov::Model> decoder_with_past_model;
 
     if (std::filesystem::exists(models_path / "openvino_decoder_with_past_model.xml") ) {
-        decoder_model = core.read_model(models_path / "openvino_decoder_model.xml", {}, properties_copy);
-        decoder_with_past_model = core.read_model(models_path / "openvino_decoder_with_past_model.xml", {}, properties_copy);
+        decoder_model = m_ov_core.read_model(models_path / "openvino_decoder_model.xml", {}, properties_copy);
+        decoder_with_past_model = m_ov_core.read_model(models_path / "openvino_decoder_with_past_model.xml", {}, properties_copy);
     } else {
-        auto model = core.read_model(models_path / "openvino_decoder_model.xml", {}, properties_copy);
+        auto model = m_ov_core.read_model(models_path / "openvino_decoder_model.xml", {}, properties_copy);
         ov::pass::StatefulToStateless().run_on_model(model);
 
         decoder_model = prepare_decoder_model(model);
@@ -1091,15 +1089,15 @@ WhisperPipeline::StaticWhisperPipeline::StaticWhisperPipeline(const std::filesys
     }
 
     ov::CompiledModel compiled_model;
-    compiled_model = core.compile_model(encoder_model, "NPU", properties_copy);
+    compiled_model = m_ov_core.compile_model(encoder_model, "NPU", properties_copy);
     ov::genai::utils::print_compiled_model_properties(compiled_model, "Static Whisper encoder model");
     m_models.encoder = compiled_model.create_infer_request();
 
-    compiled_model = core.compile_model(decoder_with_past_model, "NPU", properties_copy);
+    compiled_model = m_ov_core.compile_model(decoder_with_past_model, "NPU", properties_copy);
     ov::genai::utils::print_compiled_model_properties(compiled_model, "Static Whisper decoder with past model");
     m_models.decoder_with_past = compiled_model.create_infer_request();
 
-    compiled_model = core.compile_model(decoder_model, "NPU", properties_copy);
+    compiled_model = m_ov_core.compile_model(decoder_model, "NPU", properties_copy);
     ov::genai::utils::print_compiled_model_properties(compiled_model, "Static Whisper decoder model");
     m_models.decoder = compiled_model.create_infer_request();
 

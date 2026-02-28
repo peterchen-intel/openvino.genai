@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "openvino/core/any.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/runtime/infer_request.hpp"
 #include "openvino/runtime/properties.hpp"
 #include "openvino/runtime/tensor.hpp"
@@ -26,7 +27,14 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
+    LTXVideoTransformer3DModel(ov::Core& core, const std::filesystem::path& root_dir);
+
     explicit LTXVideoTransformer3DModel(const std::filesystem::path& root_dir);
+
+    LTXVideoTransformer3DModel(ov::Core& core,
+                               const std::filesystem::path& root_dir,
+                               const std::string& device,
+                               const ov::AnyMap& properties = {});
 
     LTXVideoTransformer3DModel(const std::filesystem::path& root_dir,
                           const std::string& device,
@@ -54,6 +62,7 @@ public:
     size_t get_request_input_batch();
 
 private:
+    ov::Core m_core;
     class Inference;
     std::shared_ptr<Inference> m_impl;
 

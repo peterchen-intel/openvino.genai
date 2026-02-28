@@ -14,6 +14,7 @@
 
 #include "openvino/genai/image_generation/generation_config.hpp"
 #include "openvino/genai/image_generation/autoencoder_kl.hpp"
+#include "openvino/runtime/core.hpp"
 
 #include "lora/helper.hpp"
 #include "lora/names_mapping.hpp"
@@ -73,15 +74,15 @@ public:
 
         if (m_pipeline_type == PipelineType::IMAGE_2_IMAGE || m_pipeline_type == PipelineType::INPAINTING) {
             const bool do_normalize = true, do_binarize = false, gray_scale_source = false;
-            m_image_processor = std::make_shared<ImageProcessor>(device, do_normalize, do_binarize, gray_scale_source);
-            m_image_resizer = std::make_shared<ImageResizer>(device, ov::element::u8, "NHWC", ov::op::v11::Interpolate::InterpolateMode::BICUBIC_PILLOW);
+            m_image_processor = std::make_shared<ImageProcessor>(m_ov_core, device, do_normalize, do_binarize, gray_scale_source);
+            m_image_resizer = std::make_shared<ImageResizer>(m_ov_core, device, ov::element::u8, "NHWC", ov::op::v11::Interpolate::InterpolateMode::BICUBIC_PILLOW);
         }
 
         if (m_pipeline_type == PipelineType::INPAINTING) {
             bool do_normalize = false, do_binarize = true;
-            m_mask_processor_rgb = std::make_shared<ImageProcessor>(device, do_normalize, do_binarize, false);
-            m_mask_processor_gray = std::make_shared<ImageProcessor>(device, do_normalize, do_binarize, true);
-            m_mask_resizer = std::make_shared<ImageResizer>(device, ov::element::f32, "NCHW", ov::op::v11::Interpolate::InterpolateMode::NEAREST);
+            m_mask_processor_rgb = std::make_shared<ImageProcessor>(m_ov_core, device, do_normalize, do_binarize, false);
+            m_mask_processor_gray = std::make_shared<ImageProcessor>(m_ov_core, device, do_normalize, do_binarize, true);
+            m_mask_resizer = std::make_shared<ImageResizer>(m_ov_core, device, ov::element::f32, "NCHW", ov::op::v11::Interpolate::InterpolateMode::NEAREST);
         }
     }
 
@@ -138,6 +139,7 @@ public:
     virtual ~DiffusionPipeline() = default;
 
 protected:
+    ov::Core m_ov_core;
     virtual void initialize_generation_config(const std::string& class_name) = 0;
 
     virtual void check_image_size(const int height, const int width) const = 0;

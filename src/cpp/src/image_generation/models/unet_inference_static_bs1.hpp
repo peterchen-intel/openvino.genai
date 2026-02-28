@@ -58,7 +58,7 @@ public:
         //reshape to batch-1
         UNetInference::reshape(model, 1);
 
-        ov::Core core = utils::singleton_core();
+        ov::Core core = ov::Core{};
         ov::CompiledModel compiled_model = core.compile_model(model, device, properties);
         ov::genai::utils::print_compiled_model_properties(compiled_model, "UNet 2D Condition batch-1 model");
 

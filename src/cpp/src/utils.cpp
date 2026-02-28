@@ -359,12 +359,6 @@ void apply_gather_before_matmul_transformation(std::shared_ptr<ov::Model> model)
     }
 }
 
-ov::Core& singleton_core() {
-    static ov::Core core;
-    return core;
-}
-
-
 namespace {
 bool is_gguf_model(const std::filesystem::path& file_path) {
     return file_path.extension() == ".gguf";
@@ -419,7 +413,7 @@ std::shared_ptr<ov::Model> read_model(const std::filesystem::path& model_dir,  c
             OPENVINO_THROW("Could not find a model in the directory '", model_dir, "'");
         }
 
-        return singleton_core().read_model(model_path, {}, filtered_properties);
+        return ov::Core{}.read_model(model_path, {}, filtered_properties);
     }
 }
 
@@ -562,7 +556,7 @@ void print_compiled_model_properties(ov::CompiledModel& compiled_Model, const ch
     for (const auto& device : exeTargets) {
         std::string full_name;
         try {
-            full_name = singleton_core().get_property(device, ov::device::full_name);
+            full_name = ov::Core{}.get_property(device, ov::device::full_name);
         } catch (const ov::Exception&) {
             continue;  // NPU: No available devices. Ticket 172485
         }
@@ -596,7 +590,7 @@ void import_npu_model(ov::CompiledModel& compiled,
     if (!fin.is_open()) {
         OPENVINO_THROW("Blob file can't be opened: " + blob_path);
     }
-    compiled = ov::genai::utils::singleton_core().import_model(fin, "NPU", config);
+    compiled = ov::Core{}.import_model(fin, "NPU", config);
     kv_desc.max_prompt_len = compiled.get_property("NPUW_LLM_MAX_PROMPT_LEN").as<uint32_t>();
     kv_desc.min_response_len = compiled.get_property("NPUW_LLM_MIN_RESPONSE_LEN").as<uint32_t>();
 }
@@ -675,7 +669,7 @@ std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_impl(const std::sha
             break;
         }
 
-        compiled = ov::genai::utils::singleton_core().compile_model(model, "NPU", properties);
+        compiled = ov::Core{}.compile_model(model, "NPU", properties);
         // Also export compiled model if required
         if (export_blob) {
             if (blob_path.empty()) {
@@ -793,7 +787,7 @@ std::pair<ov::AnyMap, std::string> extract_attention_backend(const ov::AnyMap& e
 
 void release_core_plugin(const std::string& device) {
     try {
-        singleton_core().unload_plugin(device);
+        ov::Core{}.unload_plugin(device);
     } catch (const ov::Exception&) {
         // Note: in a theory it can throw an exception when 2 different pipelines are created from
         // different threads and then both of them unload plugin for 'device' from ov::Core
@@ -847,7 +841,7 @@ ov::Tensor merge_text_and_image_embeddings_llava(const ov::Tensor& input_ids, ov
 size_t get_available_gpu_memory(const std::string& device, size_t num_decoder_layers) {
     OPENVINO_ASSERT(device.find("GPU") != std::string::npos, "get_available_gpu_memory() is applicable for GPU only.");
 
-    ov::Core core = utils::singleton_core();
+    ov::Core core = ov::Core{};
     auto memory_statistics = core.get_property(device, ov::intel_gpu::memory_statistics);
     auto device_type = core.get_property(device, ov::device::type);
 
@@ -899,7 +893,7 @@ ov::CompiledModel import_model(const std::filesystem::path& blob_path,
                                const ov::AnyMap& properties) {
     OPENVINO_ASSERT(!blob_path.empty(), "blob path is empty");
     ov::Tensor blob_tensor = ov::read_tensor_data(blob_path);
-    return ov::genai::utils::singleton_core().import_model(blob_tensor, device, properties);
+    return ov::Core{}.import_model(blob_tensor, device, properties);
 }
 
 void export_model(ov::CompiledModel& compiled_model, const std::filesystem::path& blob_path) {

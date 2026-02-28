@@ -48,7 +48,7 @@ Eagle3InferWrapperBase::Eagle3InferWrapperBase(const ModelDesc& model_desc)
         m_request = compiled.create_infer_request();
     } else {
         m_request =
-            utils::singleton_core().compile_model(model_desc.model, m_device, m_properties).create_infer_request();
+            ov::Core{}.compile_model(model_desc.model, m_device, m_properties).create_infer_request();
     }
 
     // Initialize performance metrics

@@ -95,7 +95,7 @@ public:
 
         auto properties_copy = properties;
         auto language_model_path = models_dir / "openvino_language_model.xml";
-        auto language_model =  utils::singleton_core().read_model(language_model_path, {}, properties_copy);
+        auto language_model =  m_ov_core.read_model(language_model_path, {}, properties_copy);
         auto kv_pos = ov::genai::utils::get_kv_axes_pos(language_model);
 
         // In case user provided properties per-device
@@ -122,7 +122,7 @@ public:
             m_max_kv_cache_size = kv_desc.max_prompt_len + kv_desc.min_response_len;
             npu_auto_default_properties(device_properties);
         } else {
-            compiled_language_model = utils::singleton_core().compile_model(language_model, device, lm_properties);
+            compiled_language_model = m_ov_core.compile_model(language_model, device, lm_properties);
         }
         ov::genai::utils::print_compiled_model_properties(compiled_language_model, "VLM language model");
 
@@ -173,7 +173,7 @@ public:
         m_embedding = m_inputs_embedder->get_embedding_model();
 
         auto m_language_pair = utils::get_model_weights_pair(models_map, "language");
-        m_language = utils::singleton_core().compile_model(
+        m_language = m_ov_core.compile_model(
             m_language_pair.first, m_language_pair.second, device, properties
         ).create_infer_request();
 

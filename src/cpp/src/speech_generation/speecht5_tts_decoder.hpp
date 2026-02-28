@@ -12,10 +12,12 @@ namespace ov::genai {
 class SpeechT5TTSDecoder {
 public:
     static std::shared_ptr<SpeechT5TTSDecoder> from_path(const std::filesystem::path& models_path,
+                                                         ov::Core& core,
                                                          const std::string& device,
                                                          const ov::AnyMap& properties);
 
     SpeechT5TTSDecoder(const std::filesystem::path& models_path,
+                       ov::Core& core,
                        const std::string& device,
                        const ov::AnyMap& properties);
 

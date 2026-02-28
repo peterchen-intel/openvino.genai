@@ -147,7 +147,7 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
     auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
     auto is_prompt_lookup_enabled = extract_prompt_lookup_from_config(properties_without_draft_model);
     auto eagle_rt_info = utils::eagle3::extract_eagle3_info_from_config(draft_model_desr.properties, std::filesystem::path(model_str));
-    auto model = utils::singleton_core().read_model(model_str, weights_tensor);
+    auto model = ov::Core{}.read_model(model_str, weights_tensor);
 
     auto rt_info = model->get_rt_info();
     std::shared_ptr<InputsEmbedder> embedder = nullptr;
@@ -197,7 +197,7 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
     auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
     auto is_prompt_lookup_enabled = extract_prompt_lookup_from_config(properties_without_draft_model);
     auto model_pair = utils::get_model_weights_pair(models_map, "language");
-    auto model = utils::singleton_core().read_model(model_pair.first, model_pair.second);
+    auto model = ov::Core{}.read_model(model_pair.first, model_pair.second);
 
     auto rt_info = model->get_rt_info();
     std::filesystem::path directory;

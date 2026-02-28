@@ -96,7 +96,7 @@ std::pair<std::string, Any> draft_model(
     auto [plugin_config, scheduler_config] = utils::extract_scheduler_config(properties);
 
     std::filesystem::path openvino_model_name = "openvino_model.xml";
-    auto model = utils::singleton_core().read_model(models_path / openvino_model_name, {}, plugin_config);
+    auto model = ov::Core{}.read_model(models_path / openvino_model_name, {}, plugin_config);
     utils::eagle3::apply_eagle3_rt_info(model, plugin_config);
     auto generation_config = utils::from_config_json_if_exists(models_path);
     auto tokenizer = ov::genai::Tokenizer(models_path);
@@ -112,7 +112,7 @@ std::pair<std::string, Any> draft_model(
     const ov::genai::GenerationConfig& generation_config) {
     auto [plugin_config, scheduler_config] = utils::extract_scheduler_config(properties);
 
-    auto model = utils::singleton_core().read_model(model_str, weights_tensor);
+    auto model = ov::Core{}.read_model(model_str, weights_tensor);
     utils::eagle3::apply_eagle3_rt_info(model, plugin_config);
     return { utils::DRAFT_MODEL_ARG_NAME, Any::make<ModelDesc>(model, tokenizer, device, plugin_config, scheduler_config, generation_config) };
 }
@@ -286,7 +286,7 @@ ov::genai::LLMPipeline::LLMPipeline(
 
     if (is_npu_requested) {
         m_pimpl = StatefulPipeline::create(
-            utils::singleton_core().read_model(model_str, weights_tensor),
+            ov::Core{}.read_model(model_str, weights_tensor),
             tokenizer,
             device,
             properties,
@@ -314,7 +314,7 @@ ov::genai::LLMPipeline::LLMPipeline(
         // FIXME: Switch to StatefulPipeline::create after resolving issues
         //        with GPU and CPU for StatefulSpeculativeLLMPipeline
         m_pimpl = std::make_unique<StatefulLLMPipeline>(
-            utils::singleton_core().read_model(model_str, weights_tensor),
+            ov::Core{}.read_model(model_str, weights_tensor),
             tokenizer,
             device,
             properties,

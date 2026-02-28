@@ -24,6 +24,7 @@
 #include "generation_config_utils.hpp"
 
 #include "utils.hpp"
+#include "openvino/runtime/core.hpp"
 
 using namespace ov::genai;
 
@@ -237,6 +238,7 @@ namespace ov::genai {
 class Text2VideoPipeline::LTXPipeline {
     using Ms = std::chrono::duration<float, std::ratio<1, 1000>>;
 
+    ov::Core m_ov_core;
     std::shared_ptr<IScheduler> m_scheduler;
     std::shared_ptr<T5EncoderModel> m_t5_text_encoder;
     std::shared_ptr<LTXVideoTransformer3DModel> m_transformer;
@@ -371,21 +373,21 @@ public:
 
         const std::string t5_text_encoder = data["text_encoder"][1].get<std::string>();
         if (t5_text_encoder == "T5EncoderModel") {
-            m_t5_text_encoder = std::make_shared<T5EncoderModel>(root_dir / "text_encoder");
+            m_t5_text_encoder = std::make_shared<T5EncoderModel>(m_ov_core, root_dir / "text_encoder");
         } else {
             OPENVINO_THROW("Unsupported '", t5_text_encoder, "' text encoder type");
         }
 
         const std::string vae = data["vae"][1].get<std::string>();
         if (vae == "AutoencoderKLLTXVideo") {
-            m_vae = std::make_shared<AutoencoderKLLTXVideo>(root_dir / "vae_decoder");
+            m_vae = std::make_shared<AutoencoderKLLTXVideo>(m_ov_core, root_dir / "vae_decoder");
         } else {
             OPENVINO_THROW("Unsupported '", vae, "' VAE decoder type");
         }
 
         const std::string transformer = data["transformer"][1].get<std::string>();
         if (transformer == "LTXVideoTransformer3DModel") {
-            m_transformer = std::make_shared<LTXVideoTransformer3DModel>(root_dir / "transformer");
+            m_transformer = std::make_shared<LTXVideoTransformer3DModel>(m_ov_core, root_dir / "transformer");
         } else {
             OPENVINO_THROW("Unsupported '", transformer, "' Transformer type");
         }
@@ -400,9 +402,9 @@ public:
                 const ov::AnyMap& properties,
                 std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now())
         : m_scheduler{cast_scheduler(Scheduler::from_config(models_dir / "scheduler/scheduler_config.json"))},
-          m_t5_text_encoder{std::make_shared<T5EncoderModel>(models_dir / "text_encoder", device, properties)},
-          m_transformer{std::make_shared<LTXVideoTransformer3DModel>(models_dir / "transformer", device, properties)},
-          m_vae{std::make_shared<AutoencoderKLLTXVideo>(models_dir / "vae_decoder", device, properties)},
+          m_t5_text_encoder{std::make_shared<T5EncoderModel>(m_ov_core, models_dir / "text_encoder", device, properties)},
+          m_transformer{std::make_shared<LTXVideoTransformer3DModel>(m_ov_core, models_dir / "transformer", device, properties)},
+          m_vae{std::make_shared<AutoencoderKLLTXVideo>(m_ov_core, models_dir / "vae_decoder", device, properties)},
           m_generation_config{LTX_VIDEO_DEFAULT_CONFIG} {
         m_models_dir = models_dir;
         m_text_encode_device = device;
@@ -422,9 +424,9 @@ public:
     }
 
     void rebuild_models() {
-        m_t5_text_encoder = std::make_shared<T5EncoderModel>(m_models_dir / "text_encoder");
-        m_transformer = std::make_shared<LTXVideoTransformer3DModel>(m_models_dir / "transformer");
-        m_vae = std::make_shared<AutoencoderKLLTXVideo>(m_models_dir / "vae_decoder");
+        m_t5_text_encoder = std::make_shared<T5EncoderModel>(m_ov_core, m_models_dir / "text_encoder");
+        m_transformer = std::make_shared<LTXVideoTransformer3DModel>(m_ov_core, m_models_dir / "transformer");
+        m_vae = std::make_shared<AutoencoderKLLTXVideo>(m_ov_core, m_models_dir / "vae_decoder");
     }
 
     void reshape_models(const VideoGenerationConfig& generation_config, size_t batch_size_multiplier) {

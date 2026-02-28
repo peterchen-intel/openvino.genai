@@ -4,6 +4,7 @@
 #pragma once
 
 #include "openvino/genai/whisper_pipeline.hpp"
+#include "openvino/runtime/core.hpp"
 #include "utils.hpp"
 #include "whisper/config.hpp"
 #include "whisper/feature_extractor.hpp"
@@ -13,6 +14,7 @@ namespace genai {
 
 class WhisperPipeline::WhisperPipelineImplBase {
 public:
+    ov::Core m_ov_core;
     WhisperGenerationConfig m_generation_config;
     Tokenizer m_tokenizer;
     WhisperFeatureExtractor m_feature_extractor;
