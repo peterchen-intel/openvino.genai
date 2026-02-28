@@ -8,6 +8,7 @@
 #include <string>
 
 #include "openvino/core/any.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/runtime/tensor.hpp"
 #include "openvino/runtime/infer_request.hpp"
 #include "openvino/runtime/properties.hpp"
@@ -34,10 +35,17 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
+    AutoencoderKLLTXVideo(ov::Core& core, const std::filesystem::path& vae_decoder_path);
+
     explicit AutoencoderKLLTXVideo(const std::filesystem::path& vae_decoder_path);
 
     AutoencoderKLLTXVideo(const std::filesystem::path& vae_encoder_path,
                   const std::filesystem::path& vae_decoder_path);
+
+    AutoencoderKLLTXVideo(ov::Core& core,
+                          const std::filesystem::path& vae_decoder_path,
+                          const std::string& device,
+                          const ov::AnyMap& properties = {});
 
     AutoencoderKLLTXVideo(const std::filesystem::path& vae_decoder_path,
                   const std::string& device,
@@ -61,6 +69,7 @@ public:
 private:
     void merge_vae_video_post_processing() const;
 
+    ov::Core m_core;
     Config m_config;
     ov::InferRequest m_encoder_request, m_decoder_request;
     std::shared_ptr<ov::Model> m_encoder_model = nullptr, m_decoder_model = nullptr;

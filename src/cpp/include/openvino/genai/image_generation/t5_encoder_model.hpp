@@ -12,6 +12,7 @@
 #include "openvino/genai/lora_adapter.hpp"
 
 #include "openvino/core/any.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/runtime/tensor.hpp"
 #include "openvino/runtime/infer_request.hpp"
 #include "openvino/runtime/properties.hpp"
@@ -21,7 +22,14 @@ namespace genai {
 
 class OPENVINO_GENAI_EXPORTS T5EncoderModel {
 public:
+    T5EncoderModel(ov::Core& core, const std::filesystem::path& root_dir);
+
     explicit T5EncoderModel(const std::filesystem::path& root_dir);
+
+    T5EncoderModel(ov::Core& core,
+                   const std::filesystem::path& root_dir,
+                   const std::string& device,
+                   const ov::AnyMap& properties = {});
 
     T5EncoderModel(const std::filesystem::path& root_dir,
                   const std::string& device,
@@ -79,6 +87,7 @@ public:
     ov::Tensor get_prompt_attention_mask() const;
 
 private:
+    ov::Core m_core;
     AdapterController m_adapter_controller;
     ov::InferRequest m_request;
     std::shared_ptr<ov::Model> m_model;

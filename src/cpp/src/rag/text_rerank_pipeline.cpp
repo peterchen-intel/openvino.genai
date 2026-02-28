@@ -12,6 +12,7 @@
 #include "openvino/opsets/opset.hpp"
 #include "openvino/opsets/opset1.hpp"
 #include "openvino/opsets/opset8.hpp"
+#include "openvino/runtime/core.hpp"
 #include "utils.hpp"
 
 namespace {
@@ -169,9 +170,7 @@ public:
         // qwen3 tokenizer doesn't support add_second_input(true)
         m_tokenizer = Tokenizer(models_path, ov::genai::add_second_input(!is_qwen3));
 
-        ov::Core core = utils::singleton_core();
-
-        auto model = core.read_model(models_path / "openvino_model.xml", {}, properties);
+        auto model = m_ov_core.read_model(models_path / "openvino_model.xml", {}, properties);
 
         m_has_position_ids = has_input(model, "position_ids");
         m_has_beam_idx = has_input(model, "beam_idx");
@@ -185,7 +184,7 @@ public:
             model = apply_postprocessing(model);
         }
 
-        ov::CompiledModel compiled_model = core.compile_model(model, device, properties);
+        ov::CompiledModel compiled_model = m_ov_core.compile_model(model, device, properties);
 
         utils::print_compiled_model_properties(compiled_model, "text rerank model");
         m_request = compiled_model.create_infer_request();
@@ -261,6 +260,7 @@ public:
     }
 
 private:
+    ov::Core m_ov_core;
     Tokenizer m_tokenizer;
     InferRequest m_request;
     Config m_config;

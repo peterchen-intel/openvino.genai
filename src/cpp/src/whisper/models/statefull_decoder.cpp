@@ -21,13 +21,12 @@ void reshape_hidden_states_to_static(std::shared_ptr<ov::Model> model, const ov:
 
 namespace ov::genai {
 WhisperStatefullDecoder::WhisperStatefullDecoder(const std::filesystem::path& models_path,
+                                                 ov::Core& core,
                                                  const std::string& device,
                                                  const ov::AnyMap& properties,
                                                  const ov::PartialShape& lhs_shape,
                                                  const bool decompose_cross_attention_spda)
     : m_decompose_cross_attention_spda_ops(decompose_cross_attention_spda) {
-    ov::Core core = utils::singleton_core();
-
     auto model = core.read_model(models_path / "openvino_decoder_model.xml", {}, properties);
 
     if (m_decompose_cross_attention_spda_ops) {

@@ -10,11 +10,13 @@
 
 namespace ov::genai {
 std::shared_ptr<WhisperDecoder> WhisperDecoder::from_path(const std::filesystem::path& models_path,
+                                                          ov::Core& core,
                                                           const std::string& device,
                                                           const ov::AnyMap& properties,
                                                           const ov::PartialShape& lhs_shape,
                                                           const bool decompose_cross_attention_spda_ops) {
     return std::make_shared<WhisperStatefullDecoder>(models_path,
+                                                     core,
                                                      device,
                                                      properties,
                                                      lhs_shape,

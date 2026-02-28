@@ -61,7 +61,7 @@ namespace genai {
     } else {
         // TODO: We might need it for manipulations with indices
         // utils::apply_gather_before_matmul_transformation(model_desc.model);
-        m_request = ov::genai::utils::singleton_core().compile_model(model_desc.model, m_device, m_properties).create_infer_request();
+        m_request = ov::Core{}.compile_model(model_desc.model, m_device, m_properties).create_infer_request();
     }
     raw_perf_metrics.m_inference_durations =  {{ ov::genai::MicroSeconds(0.0f) }};
 }

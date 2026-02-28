@@ -39,7 +39,7 @@ CLIPTextModel::Config::Config(const std::filesystem::path& config_path) {
 CLIPTextModel::CLIPTextModel(const std::filesystem::path& root_dir) :
     m_clip_tokenizer(get_tokenizer_path_by_text_encoder(root_dir)),
     m_config(root_dir / "config.json") {
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+    m_model = ov::Core{}.read_model(root_dir / "openvino_model.xml");
 }
 
 CLIPTextModel::CLIPTextModel(const std::filesystem::path& root_dir,
@@ -54,7 +54,7 @@ CLIPTextModel::CLIPTextModel(const std::filesystem::path& root_dir,
         return;
     }
 
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+    m_model = ov::Core{}.read_model(root_dir / "openvino_model.xml");
     compile(device, properties);
 }
 
@@ -63,7 +63,7 @@ CLIPTextModel::CLIPTextModel(const std::string& model,
                              const Config& config,
                              const Tokenizer& clip_tokenizer) :
     m_clip_tokenizer(clip_tokenizer), m_config(config) {
-    m_model = utils::singleton_core().read_model(model, weights);
+    m_model = ov::Core{}.read_model(model, weights);
 }
 
 CLIPTextModel::CLIPTextModel(const std::string& model,
@@ -116,7 +116,7 @@ CLIPTextModel& CLIPTextModel::compile(const std::string& device, const ov::AnyMa
         adapters->set_tensor_name_prefix(adapters->get_tensor_name_prefix().value_or("lora_te"));
         m_adapter_controller = AdapterController(m_model, *adapters, device);
     }
-    ov::CompiledModel compiled_model = utils::singleton_core().compile_model(m_model, device, *filtered_properties);
+    ov::CompiledModel compiled_model = ov::Core{}.compile_model(m_model, device, *filtered_properties);
     ov::genai::utils::print_compiled_model_properties(compiled_model, "Clip Text model");
     m_request = compiled_model.create_infer_request();
     // release the original model
