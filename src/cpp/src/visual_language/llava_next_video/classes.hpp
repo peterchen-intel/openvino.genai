@@ -17,11 +17,12 @@ public:
 
     ov::Tensor preprocess_frames_cpp(const std::vector<ov::Tensor>& frames);
 
-    VisionEncoderLLaVANextVideo(const std::filesystem::path& model_dir, const std::string& device, const ov::AnyMap properties);
+    VisionEncoderLLaVANextVideo(const std::filesystem::path& model_dir, const std::string& device, const std::shared_ptr<ov::Core>& core, const ov::AnyMap properties);
 
     VisionEncoderLLaVANextVideo(const ModelsMap& models_map,
         const std::filesystem::path& config_dir_path,
         const std::string& device,
+        const std::shared_ptr<ov::Core>& core,
         const ov::AnyMap device_config);
 
     CircularBufferQueueElementGuard<ov::InferRequest> get_multi_modal_projector() {
@@ -57,6 +58,7 @@ public:
         const VLMConfig& vlm_config,
         const std::filesystem::path& model_dir,
         const std::string& device,
+        const std::shared_ptr<ov::Core>& core,
         const ov::AnyMap device_config);
 
     InputsEmbedderLLaVANextVideo(
@@ -65,6 +67,7 @@ public:
         const Tokenizer& tokenizer,
         const std::filesystem::path& config_dir_path,
         const std::string& device,
+        const std::shared_ptr<ov::Core>& core,
         const ov::AnyMap device_config);
         
     ov::Tensor get_inputs_embeds(

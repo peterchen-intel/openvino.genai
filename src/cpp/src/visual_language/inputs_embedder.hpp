@@ -35,12 +35,14 @@ class InputsEmbedder {
 public:
     InputsEmbedder(const std::filesystem::path& model_dir,
                    const std::string& device,
+                   const std::shared_ptr<ov::Core>& core,
                    const ov::AnyMap device_config);
 
     InputsEmbedder(const ModelsMap& models_map,
                    const Tokenizer& tokenizer,
                    const std::filesystem::path& config_dir_path,
                    const std::string& device,
+                   const std::shared_ptr<ov::Core>& core,
                    const ov::AnyMap device_config);
 
     // compute input embedding for prompt and multiple images
@@ -249,6 +251,7 @@ private:
             const VLMConfig& vlm_config,
             const std::filesystem::path& model_dir,
             const std::string& device,
+            const std::shared_ptr<ov::Core>& core,
             const ov::AnyMap device_config);
 
         IInputsEmbedder(
@@ -257,6 +260,7 @@ private:
             const Tokenizer& tokenizer,
             const std::filesystem::path& config_dir_path,
             const std::string& device,
+            const std::shared_ptr<ov::Core>& core,
             const ov::AnyMap device_config);
 
         virtual ov::Tensor apply_chat_template_tokenize(const std::string& prompt, ov::genai::VLMPerfMetrics& metrics);

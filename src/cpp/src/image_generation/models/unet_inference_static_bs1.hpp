@@ -35,7 +35,8 @@ public:
 
     virtual void compile(std::shared_ptr<ov::Model> model,
                          const std::string& device,
-                         const ov::AnyMap& properties) override {
+                         const ov::AnyMap& properties,
+                         const std::shared_ptr<ov::Core>& core) override {
 
         // All shapes for input/output tensors should be static. 
         // Double check this and throw runtime error if it's not the case.
@@ -58,9 +59,8 @@ public:
         //reshape to batch-1
         UNetInference::reshape(model, 1);
 
-        ov::Core core = utils::singleton_core();
-        ov::CompiledModel compiled_model = core.compile_model(model, device, properties);
-        ov::genai::utils::print_compiled_model_properties(compiled_model, "UNet 2D Condition batch-1 model");
+        ov::CompiledModel compiled_model = core->compile_model(model, device, properties);
+        ov::genai::utils::print_compiled_model_properties(compiled_model, "UNet 2D Condition batch-1 model", core);
 
         for (int i = 0; i < m_native_batch_size; i++) {
             m_requests[i] = compiled_model.create_infer_request();
@@ -164,8 +164,8 @@ public:
         utils::export_model(compiled_model, blob_path / "openvino_model.blob");
     }
 
-    virtual void import_model(const std::filesystem::path& blob_path, const std::string& device, const ov::AnyMap& properties) override {
-        auto compiled_model = utils::import_model(blob_path / "openvino_model.blob", device, properties);
+    virtual void import_model(const std::filesystem::path& blob_path, const std::string& device, const ov::AnyMap& properties, const std::shared_ptr<ov::Core>& core) override {
+        auto compiled_model = utils::import_model(blob_path / "openvino_model.blob", device, properties, core);
 
         // we'll create a separate infer request for each batch.
         // todo: preserve original requested batch size when exporting the model
@@ -173,7 +173,7 @@ public:
         m_native_batch_size = compiled_model.input("sample").get_shape()[0];
         m_requests.resize(m_native_batch_size);
 
-        ov::genai::utils::print_compiled_model_properties(compiled_model, "UNet 2D Condition batch-1 model");
+        ov::genai::utils::print_compiled_model_properties(compiled_model, "UNet 2D Condition batch-1 model", core);
 
         for (int i = 0; i < m_native_batch_size; i++) {
             m_requests[i] = compiled_model.create_infer_request();

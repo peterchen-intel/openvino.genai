@@ -30,8 +30,9 @@ public:
     /**
      * @brief Constructor
      * @param config Configuration for CDPruner
+     * @param core Optional shared pointer to OpenVINO Core
      */
-    explicit CDPruner(const Config& config);
+    explicit CDPruner(const Config& config, const std::shared_ptr<ov::Core>& core = nullptr);
 
     /**
      * @brief Select diverse and relevant visual tokens
@@ -115,6 +116,7 @@ private:
 
     mutable PruningStatistics m_last_statistics;                      ///< Statistics from last operation
     mutable std::vector<std::vector<size_t>> m_last_selected_tokens;  ///< Token indices selected during last pruning
+    std::shared_ptr<ov::Core> m_core;
 };
 
 }  // namespace ov::genai::cdpruner

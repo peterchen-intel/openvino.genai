@@ -746,7 +746,7 @@ class InferRequestSignatureCache {
 public:
     using Signature = std::string;
 
-    InferRequestSignatureCache (const std::string& device) : device(device) {}
+    InferRequestSignatureCache (const std::string& device, const std::shared_ptr<ov::Core>& core) : device(device), m_core(core) {}
 
     bool exist (const Signature& signature) {
         return requests.count(signature);
@@ -789,9 +789,11 @@ public:
             }
         }
 
-        ov::Core core = ov::genai::utils::singleton_core();
+        if (!m_core) {
+            m_core = std::make_shared<ov::Core>();
+        }
         auto model = std::make_shared<ov::Model>(request_results, request_parameters);
-        auto compiled_model = core.compile_model(model, device);
+        auto compiled_model = m_core->compile_model(model, device);
         ov::genai::utils::print_compiled_model_properties(compiled_model, "Infer Request Signature Cache");
         rwb.request = compiled_model.create_infer_request();
         requests.emplace(signature, rwb);
@@ -827,6 +829,7 @@ private:
 
     std::unordered_map<Signature, RequestWithBypass> requests;
     std::string device;
+    std::shared_ptr<ov::Core> m_core;
 };
 
 
@@ -849,9 +852,9 @@ public:
 
     OPENVINO_RTTI("LoRAFuseTransform", "genai", LoRATransformBase);
 
-    LoRAFuseTransform(const LoRAWeightByNodeGetter& lora_weight_getter, const std::string& device_for_fusion = "CPU") :
+    LoRAFuseTransform(const LoRAWeightByNodeGetter& lora_weight_getter, const std::string& device_for_fusion = "CPU", const std::shared_ptr<ov::Core>& core = nullptr) :
         LoRATransformBase(lora_weight_getter),
-        fusers(device_for_fusion)
+        fusers(device_for_fusion, core)
     {}
 
     bool apply (NodePtr node, const LoRANode& lora_weight) override {
@@ -1272,10 +1275,12 @@ struct AdapterControllerImpl {
     // Stores the actual LoRA weight getter used for Constant tensor replacement
     // Needed to track which LoRA tensors were actually applied to suppress unused tensor warnings
     std::shared_ptr<LoRAWeightGetterDefault<NodePtr, NodePtr>> const_getter_impl;
+    std::shared_ptr<ov::Core> m_core;
 
-    AdapterControllerImpl(std::shared_ptr<ov::Model> model, const AdapterConfig& config) :
+    AdapterControllerImpl(std::shared_ptr<ov::Model> model, const AdapterConfig& config, const std::string& device, const std::shared_ptr<ov::Core>& core) :
         current_config(config),  // FIXME: Compare current and passed configs and change incrementally
-        lora_state_evaluators("CPU")    // FIXME: Try to run on the same device that is used for model inference
+        lora_state_evaluators(device, core),    // FIXME: Try to run on the same device that is used for model inference
+        m_core(core)
     {
         LoRAConstantGetter const_getter;
         LoRAParametersByWeightGetter params_getter;
@@ -1357,7 +1362,7 @@ struct AdapterControllerImpl {
             
         } else if(mode == AdapterConfig::MODE_FUSE) {
             // Fuse mode
-            pm.register_pass<LoRAFuseTransform>(weight_as_constant);
+            pm.register_pass<LoRAFuseTransform>(weight_as_constant, "CPU", m_core);
             pm.register_pass<LoRAReplaceConstantTransformStatic>(const_replacement_getter);
         } else {
             OPENVINO_THROW("Unrecognized AdapterConfig::Mode was used: ", mode);
@@ -1741,7 +1746,7 @@ struct AdapterControllerImpl {
 };
 
 
-AdapterController::AdapterController(std::shared_ptr<ov::Model> model, const AdapterConfig& config, std::string device)
+AdapterController::AdapterController(std::shared_ptr<ov::Model> model, const AdapterConfig& config, std::string device, const std::shared_ptr<ov::Core>& core)
 {
     // If AdapterConfig::MODE_AUTO is used, then set real mode depending on the device capabilities
     // TODO: Remove this code when devices become aligned on their capabilities for LoRA adapters
@@ -1758,7 +1763,7 @@ AdapterController::AdapterController(std::shared_ptr<ov::Model> model, const Ada
         if(default_mode != default_modes.end()) {
             AdapterConfig updated_config = config;
             updated_config.set_mode(default_mode->second);
-            m_pimpl = std::make_shared<AdapterControllerImpl>(model, updated_config);
+            m_pimpl = std::make_shared<AdapterControllerImpl>(model, updated_config, device, core);
             return;
         } else {
             std::string device_msg;
@@ -1773,7 +1778,7 @@ AdapterController::AdapterController(std::shared_ptr<ov::Model> model, const Ada
                 << "To avoid this warning set one of the AdapterConfig::Mode values except MODE_AUTO.";
         }
     }
-    m_pimpl = std::make_shared<AdapterControllerImpl>(model, config);
+    m_pimpl = std::make_shared<AdapterControllerImpl>(model, config, device, core);
 }
 
 

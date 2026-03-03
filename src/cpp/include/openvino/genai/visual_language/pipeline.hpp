@@ -32,7 +32,8 @@ public:
     VLMPipeline(
         const std::filesystem::path& models_path,
         const std::string& device,
-        const ov::AnyMap& properties = {}
+        const ov::AnyMap& properties = {},
+        const std::shared_ptr<ov::Core>& core = nullptr
     );
 
     /// @brief Construct a pipeline from a map of models and their weights.
@@ -50,7 +51,8 @@ public:
         const std::filesystem::path& config_dir_path,
         const std::string& device,
         const ov::AnyMap& properties = {},
-        const ov::genai::GenerationConfig& generation_config = {}
+        const ov::genai::GenerationConfig& generation_config = {},
+        const std::shared_ptr<ov::Core>& core = nullptr
     );
 
     /// @brief Construct a pipeline from a folder containing tokenizer

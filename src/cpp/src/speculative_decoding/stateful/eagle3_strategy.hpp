@@ -45,7 +45,7 @@ struct InferResult {
  */
 class Eagle3InferWrapperBase {
 public:
-    explicit Eagle3InferWrapperBase(const ov::genai::ModelDesc& model_desc);
+    explicit Eagle3InferWrapperBase(const ov::genai::ModelDesc& model_desc, const std::shared_ptr<ov::Core>& core);
     virtual ~Eagle3InferWrapperBase() = default;
 
     std::string device() const {
@@ -167,7 +167,7 @@ protected:
  */
 class Eagle3TargetWrapper : public Eagle3InferWrapperBase {
 public:
-    explicit Eagle3TargetWrapper(const ov::genai::ModelDesc& model_desc);
+    explicit Eagle3TargetWrapper(const ov::genai::ModelDesc& model_desc, const std::shared_ptr<ov::Core>& core);
     ~Eagle3TargetWrapper() = default;
 
     /// @brief Initializes sequence with prompt tokens
@@ -188,7 +188,7 @@ public:
  */
 class Eagle3DraftWrapper : public Eagle3InferWrapperBase {
 public:
-    explicit Eagle3DraftWrapper(const ov::genai::ModelDesc& model_desc);
+    explicit Eagle3DraftWrapper(const ov::genai::ModelDesc& model_desc, const std::shared_ptr<ov::Core>& core);
     ~Eagle3DraftWrapper() = default;
 
     /// @brief Initializes sequence using tokens[1:] per Eagle3 spec
@@ -212,7 +212,8 @@ public:
 class StatefulEagle3LLMPipeline : public StatefulSpeculativePipelineBase {
 public:
     StatefulEagle3LLMPipeline(const ov::genai::ModelDesc& target_model_desc,
-                              const ov::genai::ModelDesc& draft_model_desc);
+                              const ov::genai::ModelDesc& draft_model_desc,
+                              const std::shared_ptr<ov::Core>& core);
     ~StatefulEagle3LLMPipeline();
 
     ov::genai::SpeculativeDecodingMetrics get_speculative_decoding_metrics() const;

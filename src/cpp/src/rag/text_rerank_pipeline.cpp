@@ -145,12 +145,15 @@ TextRerankPipeline::Config::Config(const ov::AnyMap& properties) {
 };
 
 class TextRerankPipeline::TextRerankPipelineImpl {
+    std::shared_ptr<ov::Core> m_ov_core;
 public:
     TextRerankPipelineImpl(const std::filesystem::path& models_path,
                            const std::string& device,
                            const Config& config,
-                           const ov::AnyMap& properties = {})
-        : m_config{config} {
+                           const ov::AnyMap& properties = {},
+                           const std::shared_ptr<ov::Core>& core = nullptr)
+        : m_ov_core(core ? core : std::make_shared<ov::Core>()),
+          m_config{config} {
         const auto model_type = read_model_type(models_path);
         const bool is_qwen3 = model_type.has_value() && model_type.value() == "qwen3";
 
@@ -169,9 +172,9 @@ public:
         // qwen3 tokenizer doesn't support add_second_input(true)
         m_tokenizer = Tokenizer(models_path, ov::genai::add_second_input(!is_qwen3));
 
-        ov::Core core = utils::singleton_core();
+        std::shared_ptr<ov::Core> core_ptr = m_ov_core;
 
-        auto model = core.read_model(models_path / "openvino_model.xml", {}, properties);
+        auto model = core_ptr->read_model(models_path / "openvino_model.xml", {}, properties);
 
         m_has_position_ids = has_input(model, "position_ids");
         m_has_beam_idx = has_input(model, "beam_idx");
@@ -185,7 +188,7 @@ public:
             model = apply_postprocessing(model);
         }
 
-        ov::CompiledModel compiled_model = core.compile_model(model, device, properties);
+        ov::CompiledModel compiled_model = core_ptr->compile_model(model, device, properties);
 
         utils::print_compiled_model_properties(compiled_model, "text rerank model");
         m_request = compiled_model.create_infer_request();

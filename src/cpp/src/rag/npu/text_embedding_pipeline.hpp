@@ -13,10 +13,12 @@ InferRequest create_text_embedding_npu_request(std::shared_ptr<ov::Model>& model
                                                const TextEmbeddingPipeline::Config& config,
                                                const ov::AnyMap& properties,
                                                std::optional<size_t> max_position_embeddings,
-                                               const bool is_seq_len_fixed);
+                                               const bool is_seq_len_fixed,
+                                               const std::shared_ptr<ov::Core>& core);
 
 InferRequest create_text_embedding_npu_post_request(std::shared_ptr<ov::Model>& model,
-                                                    const TextEmbeddingPipeline::Config& config);
+                                                    const TextEmbeddingPipeline::Config& config,
+                                                    const std::shared_ptr<ov::Core>& core);
 
 }  // namespace genai
 }  // namespace ov

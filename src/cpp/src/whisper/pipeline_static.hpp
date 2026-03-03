@@ -18,7 +18,7 @@ namespace genai {
 
 class WhisperPipeline::StaticWhisperPipeline : public WhisperPipeline::WhisperPipelineImplBase {
 public:
-    StaticWhisperPipeline(const std::filesystem::path& model_path, const ov::AnyMap& properties);
+    StaticWhisperPipeline(const std::filesystem::path& model_path, const ov::AnyMap& properties, const std::shared_ptr<ov::Core>& core = nullptr);
 
     WhisperDecodedResults generate(const RawSpeechInput& raw_speech_input,
                                    OptionalWhisperGenerationConfig generation_config,

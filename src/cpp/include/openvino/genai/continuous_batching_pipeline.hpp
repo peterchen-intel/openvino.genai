@@ -81,6 +81,8 @@ protected:
 
     std::shared_ptr<IContinuousBatchingPipeline> m_impl;
 
+    std::shared_ptr<ov::Core> m_ov_core;
+
     ContinuousBatchingPipeline() = default;
 
 public:
@@ -89,7 +91,8 @@ public:
                                const std::string& device,
                                const ov::AnyMap& properties = {},
                                const ov::AnyMap& tokenizer_properties = {},
-                               const ov::AnyMap& vision_encoder_properties = {});
+                               const ov::AnyMap& vision_encoder_properties = {},
+                               const std::shared_ptr<ov::Core>& core = nullptr);
 
     /**
     * @brief Constructs a ContinuousBatchingPipeline when ov::genai::Tokenizer is initialized manually using file from the different dirs.
@@ -99,13 +102,15 @@ public:
     * @param tokenizer manually initialized ov::genai::Tokenizer
     * @param device optional device
     * @param properties optional properties
+    * @param core optional shared pointer to ov::Core
     */
     ContinuousBatchingPipeline(
         const std::filesystem::path& models_path,
         const ov::genai::Tokenizer& tokenizer,
         const SchedulerConfig& scheduler_config,
         const std::string& device,
-        const ov::AnyMap& properties = {}
+        const ov::AnyMap& properties = {},
+        const std::shared_ptr<ov::Core>& core = nullptr
     );
 
     /**
@@ -123,6 +128,7 @@ public:
      * @param device The device to run the pipeline on (e.g., CPU, GPU).
      * @param properties Optional properties for the pipeline.
      * @param generation_config Optional generation configuration for the pipeline.
+     * @param core Optional shared pointer to ov::Core.
      */
     ContinuousBatchingPipeline(
         const std::string& model_str,
@@ -131,7 +137,8 @@ public:
         const SchedulerConfig& scheduler_config,
         const std::string& device,
         const ov::AnyMap& properties = {},
-        const ov::genai::GenerationConfig& generation_config = {}
+        const ov::genai::GenerationConfig& generation_config = {},
+        const std::shared_ptr<ov::Core>& core = nullptr
     );
 
     /**
@@ -145,6 +152,7 @@ public:
     * @param embedder_config_dir_path Optional path to a directory containing embedder config.
     * @param properties Optional properties for the pipeline.
     * @param generation_config Optional generation configuration for the pipeline.
+    * @param core Optional shared pointer to ov::Core.
     */
     ContinuousBatchingPipeline(
         const ModelsMap& models_map,
@@ -153,7 +161,8 @@ public:
         const std::string& device,
         std::optional<std::filesystem::path> embedder_config_dir_path = std::nullopt,
         const ov::AnyMap& properties = {},
-        const ov::genai::GenerationConfig& generation_config = {}
+        const ov::genai::GenerationConfig& generation_config = {},
+        const std::shared_ptr<ov::Core>& core = nullptr
     );
 
     ov::genai::Tokenizer get_tokenizer() const;

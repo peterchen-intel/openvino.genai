@@ -94,12 +94,14 @@ public:
     /// preprocessor_config.json.
     /// @param model_type A type of VLM model.
     /// @param device A device to compile the encoder for.
+    /// @param core A shared pointer to ov::Core.
     /// @param properties A config to be passed to
     /// ov::Core::compile_model().
     static VisionEncoder::Ptr create(
         const std::filesystem::path& model_dir,
         const VLMModelType model_type,
         const std::string& device,
+        const std::shared_ptr<ov::Core>& core,
         const ov::AnyMap properties = {});
 
     /// @brief Constructs the encoder from models map.
@@ -107,6 +109,7 @@ public:
     /// @param config_dir_path A path to directory containing preprocessor_config.json.
     /// @param model_type A type of VLM model.
     /// @param device A device to compile the encoder for.
+    /// @param core A shared pointer to ov::Core.
     /// @param properties A config to be passed to
     /// ov::Core::compile_model().
     static VisionEncoder::Ptr create(
@@ -114,6 +117,7 @@ public:
         const std::filesystem::path& config_dir_path,
         const VLMModelType model_type,
         const std::string& device,
+        const std::shared_ptr<ov::Core>& core,
         const ov::AnyMap properties = {});
 
     /// @brief Compute embeddings of an image given
@@ -146,12 +150,14 @@ public:
     VisionEncoder(
         const std::filesystem::path& model_dir,
         const std::string& device,
+        const std::shared_ptr<ov::Core>& core,
         const ov::AnyMap properties);
 
     VisionEncoder(
         const ModelsMap& models_map,
         const std::filesystem::path& config_dir_path,
         const std::string& device,
+        const std::shared_ptr<ov::Core>& core,
         const ov::AnyMap properties);
 };
 

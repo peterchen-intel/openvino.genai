@@ -189,7 +189,7 @@ public:
 
     AdapterController() = default;
 
-    AdapterController(std::shared_ptr<ov::Model> model, const AdapterConfig& config, std::string device);
+    AdapterController(std::shared_ptr<ov::Model> model, const AdapterConfig& config, std::string device, const std::shared_ptr<ov::Core>& core);
 
     // Apply adapters configured in the current config set last time, or set and use new config given as optional `config` argument
     void apply(ov::InferRequest request, const std::optional<AdapterConfig>& config = std::nullopt);

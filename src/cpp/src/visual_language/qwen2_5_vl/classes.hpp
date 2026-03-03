@@ -24,6 +24,7 @@ public:
         const VLMConfig& vlm_config,
         const std::filesystem::path& model_dir,
         const std::string& device,
+        const std::shared_ptr<ov::Core>& core,
         const ov::AnyMap device_config);
 
     InputsEmbedderQwen2_5_VL(
@@ -32,6 +33,7 @@ public:
         const Tokenizer& tokenizer, 
         const std::filesystem::path& config_dir_path,
         const std::string& device,
+        const std::shared_ptr<ov::Core>& core,
         const ov::AnyMap device_config);
 
 protected:

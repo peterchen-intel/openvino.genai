@@ -80,19 +80,22 @@ void TextEmbeddingPipeline::Config::validate() const {
 }
 
 class TextEmbeddingPipeline::TextEmbeddingPipelineImpl {
+    std::shared_ptr<ov::Core> m_ov_core;
 public:
     TextEmbeddingPipelineImpl(const std::filesystem::path& models_path,
                               const std::string& device,
                               const Config& config,
-                              const ov::AnyMap& properties = {})
-        : m_config{config},
+                              const ov::AnyMap& properties = {},
+                              const std::shared_ptr<ov::Core>& core = nullptr)
+        : m_ov_core(core ? core : std::make_shared<ov::Core>()),
+          m_config{config},
           m_tokenizer{models_path},
           m_max_position_embeddings{read_max_position_embeddings(models_path)} {
         m_config.validate();
 
-        ov::Core core = utils::singleton_core();
+        std::shared_ptr<ov::Core> core_ptr = m_ov_core;
 
-        auto model = core.read_model(models_path / "openvino_model.xml", {}, properties);
+        auto model = core_ptr->read_model(models_path / "openvino_model.xml", {}, properties);
 
         bool is_seq_len_fixed = true;
         if (m_config.max_length) {
@@ -117,14 +120,15 @@ public:
                                                           m_config,
                                                           properties,
                                                           m_max_position_embeddings,
-                                                          is_seq_len_fixed);
-            m_post_request = create_text_embedding_npu_post_request(model, m_config);
+                                                          is_seq_len_fixed,
+                                                          core_ptr);
+            m_post_request = create_text_embedding_npu_post_request(model, m_config, core_ptr);
         } else {
             if (m_config.batch_size.has_value() || m_config.max_length.has_value()) {
                 utils::reshape_model(model, m_config, m_max_position_embeddings);
             }
             model = utils::apply_postprocessing(model, m_config);
-            auto compiled_model = core.compile_model(model, device, properties);
+            auto compiled_model = core_ptr->compile_model(model, device, properties);
             utils::print_compiled_model_properties(compiled_model, "text embedding model");
             m_request = compiled_model.create_infer_request();
         }

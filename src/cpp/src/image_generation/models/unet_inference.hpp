@@ -14,12 +14,12 @@ class UNet2DConditionModel::UNetInference {
 
 public:
     virtual std::shared_ptr<UNetInference> clone() = 0;
-    virtual void compile(std::shared_ptr<ov::Model> model, const std::string& device, const ov::AnyMap& properties) = 0;
+    virtual void compile(std::shared_ptr<ov::Model> model, const std::string& device, const ov::AnyMap& properties, const std::shared_ptr<ov::Core>& core) = 0;
     virtual void set_hidden_states(const std::string& tensor_name, ov::Tensor encoder_hidden_states) = 0;
     virtual void set_adapters(AdapterController& adapter_controller, const AdapterConfig& adapters) = 0;
     virtual ov::Tensor infer(ov::Tensor sample, ov::Tensor timestep) = 0;
     virtual void export_model(const std::filesystem::path& blob_path) = 0;
-    virtual void import_model(const std::filesystem::path& blob_path, const std::string& device, const ov::AnyMap& properties) = 0;
+    virtual void import_model(const std::filesystem::path& blob_path, const std::string& device, const ov::AnyMap& properties, const std::shared_ptr<ov::Core>& core) = 0;
 
     // utility function to resize model given optional dimensions.
     static void reshape(std::shared_ptr<ov::Model> model,

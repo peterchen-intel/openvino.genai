@@ -112,23 +112,26 @@ AutoencoderKL::Config::Config(const std::filesystem::path& config_path) {
     read_json_param(data, "block_out_channels", block_out_channels);
 }
 
-AutoencoderKL::AutoencoderKL(const std::filesystem::path& vae_decoder_path)
-    : m_config(vae_decoder_path / "config.json") {
-    m_decoder_model = utils::singleton_core().read_model(vae_decoder_path / "openvino_model.xml");
+AutoencoderKL::AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                               const std::filesystem::path& vae_decoder_path)
+    : m_config(vae_decoder_path / "config.json"), m_core(core) {
+    m_decoder_model = m_core->read_model(vae_decoder_path / "openvino_model.xml");
     // apply VaeImageProcessor postprocessing steps by merging them into the VAE decoder model
     merge_vae_image_post_processing();
 }
 
-AutoencoderKL::AutoencoderKL(const std::filesystem::path& vae_encoder_path,
+AutoencoderKL::AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                             const std::filesystem::path& vae_encoder_path,
                              const std::filesystem::path& vae_decoder_path)
-    : AutoencoderKL(vae_decoder_path) {
-    m_encoder_model = utils::singleton_core().read_model(vae_encoder_path / "openvino_model.xml");
+    : AutoencoderKL(core, vae_decoder_path) {
+    m_encoder_model = m_core->read_model(vae_encoder_path / "openvino_model.xml");
 }
 
-AutoencoderKL::AutoencoderKL(const std::filesystem::path& vae_decoder_path,
+AutoencoderKL::AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                             const std::filesystem::path& vae_decoder_path,
                              const std::string& device,
                              const ov::AnyMap& properties)
-    : m_config(vae_decoder_path / "config.json") {
+    : m_config(vae_decoder_path / "config.json"), m_core(core) {
 
     const auto [properties_without_blob, blob_path] = utils::extract_export_properties(properties);
 
@@ -137,55 +140,61 @@ AutoencoderKL::AutoencoderKL(const std::filesystem::path& vae_decoder_path,
         return;
     }
 
-    m_decoder_model = utils::singleton_core().read_model(vae_decoder_path / "openvino_model.xml");
+    m_decoder_model = m_core->read_model(vae_decoder_path / "openvino_model.xml");
     // apply VaeImageProcessor postprocessing steps by merging them into the VAE decoder model
     merge_vae_image_post_processing();
     compile(device, *extract_adapters_from_properties(properties_without_blob));
 }
 
-AutoencoderKL::AutoencoderKL(const std::filesystem::path& vae_encoder_path,
+AutoencoderKL::AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                             const std::filesystem::path& vae_encoder_path,
                              const std::filesystem::path& vae_decoder_path,
                              const std::string& device,
                              const ov::AnyMap& properties)
-    : AutoencoderKL(vae_encoder_path, vae_decoder_path) {
+    : AutoencoderKL(core, vae_encoder_path, vae_decoder_path) {
     compile(device, *extract_adapters_from_properties(properties));
 }
 
-AutoencoderKL::AutoencoderKL(const std::string& vae_decoder_model,
+AutoencoderKL::AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                             const std::string& vae_decoder_model,
                              const Tensor& vae_decoder_weights,
                              const Config& vae_decoder_config)
-    : m_config(vae_decoder_config) {
-    m_decoder_model = utils::singleton_core().read_model(vae_decoder_model, vae_decoder_weights);
+    : m_config(vae_decoder_config), m_core(core) {
+    m_decoder_model = m_core->read_model(vae_decoder_model, vae_decoder_weights);
     // apply VaeImageProcessor postprocessing steps by merging them into the VAE decoder model
     merge_vae_image_post_processing();
 }
 
-AutoencoderKL::AutoencoderKL(const std::string& vae_encoder_model,
+AutoencoderKL::AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                             const std::string& vae_encoder_model,
                              const Tensor& vae_encoder_weights,
                              const std::string& vae_decoder_model,
                              const Tensor& vae_decoder_weights,
                              const Config& vae_decoder_config)
-    : AutoencoderKL(vae_decoder_model, vae_decoder_weights, vae_decoder_config) {
-    m_encoder_model = utils::singleton_core().read_model(vae_encoder_model, vae_encoder_weights);
+    : AutoencoderKL(core, vae_decoder_model, vae_decoder_weights, vae_decoder_config) {
+    m_encoder_model = m_core->read_model(vae_encoder_model, vae_encoder_weights);
 }
 
-AutoencoderKL::AutoencoderKL(const std::string& vae_decoder_model,
+AutoencoderKL::AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                             const std::string& vae_decoder_model,
                              const Tensor& vae_decoder_weights,
                              const Config& vae_decoder_config,
                              const std::string& device,
                              const ov::AnyMap& properties)
-    : AutoencoderKL(vae_decoder_model, vae_decoder_weights, vae_decoder_config) {
+    : AutoencoderKL(core, vae_decoder_model, vae_decoder_weights, vae_decoder_config) {
     compile(device, *extract_adapters_from_properties(properties));
 }
 
-AutoencoderKL::AutoencoderKL(const std::string& vae_encoder_model,
+AutoencoderKL::AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                             const std::string& vae_encoder_model,
                              const Tensor& vae_encoder_weights,
                              const std::string& vae_decoder_model,
                              const Tensor& vae_decoder_weights,
                              const Config& vae_decoder_config,
                              const std::string& device,
                              const ov::AnyMap& properties)
-    : AutoencoderKL(vae_encoder_model,
+    : AutoencoderKL(core,
+                    vae_encoder_model,
                     vae_encoder_weights,
                     vae_decoder_model,
                     vae_decoder_weights,
@@ -247,21 +256,20 @@ AutoencoderKL& AutoencoderKL::reshape(int batch_size, int height, int width) {
 
 AutoencoderKL& AutoencoderKL::compile(const std::string& device, const ov::AnyMap& properties) {
     OPENVINO_ASSERT(m_decoder_model, "Model has been already compiled. Cannot re-compile already compiled model");
-    ov::Core core = utils::singleton_core();
 
     std::optional<AdapterConfig> unused;
     auto filtered_properties = extract_adapters_from_properties(properties, &unused);
 
     if (m_encoder_model) {
-        ov::CompiledModel encoder_compiled_model = core.compile_model(m_encoder_model, device, handle_scale_factor(m_encoder_model, device, *filtered_properties));
-        ov::genai::utils::print_compiled_model_properties(encoder_compiled_model, "Auto encoder KL encoder model");
+        ov::CompiledModel encoder_compiled_model = m_core->compile_model(m_encoder_model, device, handle_scale_factor(m_encoder_model, device, *filtered_properties));
+        ov::genai::utils::print_compiled_model_properties(encoder_compiled_model, "Auto encoder KL encoder model", m_core);
         m_encoder_request = encoder_compiled_model.create_infer_request();
         // release the original model
         m_encoder_model.reset();
     }
 
-    ov::CompiledModel decoder_compiled_model = core.compile_model(m_decoder_model, device, handle_scale_factor(m_decoder_model, device, *filtered_properties));
-    ov::genai::utils::print_compiled_model_properties(decoder_compiled_model, "Auto encoder KL decoder model");
+    ov::CompiledModel decoder_compiled_model = m_core->compile_model(m_decoder_model, device, handle_scale_factor(m_decoder_model, device, *filtered_properties));
+    ov::genai::utils::print_compiled_model_properties(decoder_compiled_model, "Auto encoder KL decoder model", m_core);
     m_decoder_request = decoder_compiled_model.create_infer_request();
     // release the original model
     m_decoder_model.reset();
@@ -356,13 +364,13 @@ void AutoencoderKL::export_model(const std::filesystem::path& blob_path) {
 }
 
 void AutoencoderKL::import_model(const std::filesystem::path& blob_path, const std::string& device, const ov::AnyMap& properties) {
-    auto decoder_compiled_model = utils::import_model(blob_path / "vae_decoder" / "openvino_model.blob", device, properties);
-    ov::genai::utils::print_compiled_model_properties(decoder_compiled_model, "Auto encoder KL decoder model");
+    auto decoder_compiled_model = utils::import_model(blob_path / "vae_decoder" / "openvino_model.blob", device, properties, m_core);
+    ov::genai::utils::print_compiled_model_properties(decoder_compiled_model, "Auto encoder KL decoder model", m_core);
     m_decoder_request = decoder_compiled_model.create_infer_request();
 
     if (std::filesystem::exists(blob_path / "vae_encoder" / "openvino_model.blob")) {
-        auto encoder_compiled_model = utils::import_model(blob_path / "vae_encoder" / "openvino_model.blob", device, properties);
-        ov::genai::utils::print_compiled_model_properties(encoder_compiled_model, "Auto encoder KL encoder model");
+        auto encoder_compiled_model = utils::import_model(blob_path / "vae_encoder" / "openvino_model.blob", device, properties, m_core);
+        ov::genai::utils::print_compiled_model_properties(encoder_compiled_model, "Auto encoder KL encoder model", m_core);
         m_encoder_request = encoder_compiled_model.create_infer_request();
     }
 }

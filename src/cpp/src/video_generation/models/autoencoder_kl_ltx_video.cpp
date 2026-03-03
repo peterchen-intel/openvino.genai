@@ -83,38 +83,41 @@ AutoencoderKLLTXVideo::Config::Config(const std::filesystem::path& config_path) 
     }
 }
 
-AutoencoderKLLTXVideo::AutoencoderKLLTXVideo(const std::filesystem::path& vae_decoder_path)
-    : m_config(vae_decoder_path / "config.json") {
-    m_decoder_model = utils::singleton_core().read_model(vae_decoder_path / "openvino_model.xml");
+AutoencoderKLLTXVideo::AutoencoderKLLTXVideo(const std::filesystem::path& vae_decoder_path, const std::shared_ptr<ov::Core>& core)
+    : m_config(vae_decoder_path / "config.json"),
+      m_core(core ? core : std::make_shared<ov::Core>()) {
+    m_decoder_model = m_core->read_model(vae_decoder_path / "openvino_model.xml");
     std::tie(m_transformer_patch_size, m_transformer_patch_size_t) = get_transformer_patch_size(vae_decoder_path.parent_path() / "transformer" / "config.json");
     // apply VaeImageProcessor postprocessing steps by merging them into the VAE decoder model
     merge_vae_video_post_processing();
 }
 
 AutoencoderKLLTXVideo::AutoencoderKLLTXVideo(const std::filesystem::path& vae_encoder_path,
-                                const std::filesystem::path& vae_decoder_path)
-    : AutoencoderKLLTXVideo(vae_decoder_path) {
-    m_encoder_model = utils::singleton_core().read_model(vae_encoder_path / "openvino_model.xml");
+                                const std::filesystem::path& vae_decoder_path, const std::shared_ptr<ov::Core>& core)
+    : AutoencoderKLLTXVideo(vae_decoder_path, core) {
+    m_encoder_model = m_core->read_model(vae_encoder_path / "openvino_model.xml");
 }
 
 AutoencoderKLLTXVideo::AutoencoderKLLTXVideo(const std::filesystem::path& vae_decoder_path,
                              const std::string& device,
-                             const ov::AnyMap& properties)
-    : AutoencoderKLLTXVideo(vae_decoder_path) {
+                             const ov::AnyMap& properties,
+                             const std::shared_ptr<ov::Core>& core)
+    : AutoencoderKLLTXVideo(vae_decoder_path, core) {
     compile(device, *extract_adapters_from_properties(properties));
 }
 
 AutoencoderKLLTXVideo::AutoencoderKLLTXVideo(const std::filesystem::path& vae_encoder_path,
                              const std::filesystem::path& vae_decoder_path,
                              const std::string& device,
-                             const ov::AnyMap& properties)
-    : AutoencoderKLLTXVideo(vae_encoder_path, vae_decoder_path) {
+                             const ov::AnyMap& properties,
+                             const std::shared_ptr<ov::Core>& core)
+    : AutoencoderKLLTXVideo(vae_encoder_path, vae_decoder_path, core) {
     compile(device, *extract_adapters_from_properties(properties));
 }
 
 AutoencoderKLLTXVideo& AutoencoderKLLTXVideo::compile(const std::string& device, const ov::AnyMap& properties) {
     OPENVINO_ASSERT(m_decoder_model, "Model has been already compiled. Cannot re-compile already compiled model");
-    ov::Core core = utils::singleton_core();
+    std::shared_ptr<ov::Core> core = m_core;
 
     std::optional<AdapterConfig> unused;
     auto filtered_properties = extract_adapters_from_properties(properties, &unused);
@@ -122,8 +125,8 @@ AutoencoderKLLTXVideo& AutoencoderKLLTXVideo::compile(const std::string& device,
     // TODO: for img2video
     // if (m_encoder_model) {...}
 
-    ov::CompiledModel decoder_compiled_model = core.compile_model(m_decoder_model, device, handle_scale_factor(m_decoder_model, device, *filtered_properties));
-    ov::genai::utils::print_compiled_model_properties(decoder_compiled_model, "Auto encoder KL LTX video decoder model");
+    ov::CompiledModel decoder_compiled_model = core->compile_model(m_decoder_model, device, handle_scale_factor(m_decoder_model, device, *filtered_properties));
+    ov::genai::utils::print_compiled_model_properties(decoder_compiled_model, "Auto encoder KL LTX video decoder model", core);
     m_decoder_request = decoder_compiled_model.create_infer_request();
     // release the original model
     m_decoder_model.reset();

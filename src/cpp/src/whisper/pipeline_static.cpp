@@ -1029,16 +1029,17 @@ namespace ov {
 namespace genai {
 
 WhisperPipeline::StaticWhisperPipeline::StaticWhisperPipeline(const std::filesystem::path& models_path,
-                                                              const ov::AnyMap& properties)
-    : WhisperPipelineImplBase{models_path}
+                                                              const ov::AnyMap& properties,
+                                                              const std::shared_ptr<ov::Core>& core)
+    : WhisperPipelineImplBase{models_path, core}
     , m_sampler(m_tokenizer) {
     ov::AnyMap properties_copy = properties;
     m_generation_config.update_generation_config(properties_copy);
     erase_whisper_generation_config_keys(properties_copy);
-    
-    ov::Core core = utils::singleton_core();
 
-    auto encoder_model = core.read_model(models_path / "openvino_encoder_model.xml", {}, properties_copy);
+    std::shared_ptr<ov::Core> core = m_ov_core;
+
+    auto encoder_model = core->read_model(models_path / "openvino_encoder_model.xml", {}, properties_copy);
     reshape_to_static_encoder(encoder_model, m_feature_extractor.feature_size);
     auto last_hidden_state_shape = get_encoder_hidden_state_shape(encoder_model);
 
@@ -1046,10 +1047,10 @@ WhisperPipeline::StaticWhisperPipeline::StaticWhisperPipeline(const std::filesys
     std::shared_ptr<ov::Model> decoder_with_past_model;
 
     if (std::filesystem::exists(models_path / "openvino_decoder_with_past_model.xml") ) {
-        decoder_model = core.read_model(models_path / "openvino_decoder_model.xml", {}, properties_copy);
-        decoder_with_past_model = core.read_model(models_path / "openvino_decoder_with_past_model.xml", {}, properties_copy);
+        decoder_model = core->read_model(models_path / "openvino_decoder_model.xml", {}, properties_copy);
+        decoder_with_past_model = core->read_model(models_path / "openvino_decoder_with_past_model.xml", {}, properties_copy);
     } else {
-        auto model = core.read_model(models_path / "openvino_decoder_model.xml", {}, properties_copy);
+        auto model = core->read_model(models_path / "openvino_decoder_model.xml", {}, properties_copy);
         ov::pass::StatefulToStateless().run_on_model(model);
 
         decoder_model = prepare_decoder_model(model);

@@ -359,10 +359,6 @@ void apply_gather_before_matmul_transformation(std::shared_ptr<ov::Model> model)
     }
 }
 
-ov::Core& singleton_core() {
-    static ov::Core core;
-    return core;
-}
 
 
 namespace {
@@ -400,8 +396,9 @@ void save_openvino_model(const std::shared_ptr<ov::Model>& model, const std::str
     }
 }
 
-std::shared_ptr<ov::Model> read_model(const std::filesystem::path& model_dir,  const ov::AnyMap& properties) {
-    auto [filtered_properties, enable_save_ov_model] = extract_gguf_properties(properties);
+
+std::shared_ptr<ov::Model> read_model(const std::filesystem::path& model_dir, const ov::AnyMap& config, const std::shared_ptr<ov::Core>& core) {
+    auto [filtered_properties, enable_save_ov_model] = extract_gguf_properties(config);
     if (is_gguf_model(model_dir)) {
 #ifdef ENABLE_GGUF
         return create_from_gguf(model_dir.string(), enable_save_ov_model);
@@ -419,7 +416,7 @@ std::shared_ptr<ov::Model> read_model(const std::filesystem::path& model_dir,  c
             OPENVINO_THROW("Could not find a model in the directory '", model_dir, "'");
         }
 
-        return singleton_core().read_model(model_path, {}, filtered_properties);
+        return core->read_model(model_path, {}, filtered_properties);
     }
 }
 
@@ -527,7 +524,7 @@ bool env_setup_for_print_debug_info() {
     return (env_var_value != nullptr && atoi(env_var_value) > static_cast<int>(ov::log::Level::WARNING));
 }
 
-void print_compiled_model_properties(ov::CompiledModel& compiled_Model, const char* model_title) {
+void print_compiled_model_properties(ov::CompiledModel& compiled_Model, const char* model_title, const std::shared_ptr<ov::Core>& core) {
     if (!env_setup_for_print_debug_info()) {
         return;
     }
@@ -562,7 +559,7 @@ void print_compiled_model_properties(ov::CompiledModel& compiled_Model, const ch
     for (const auto& device : exeTargets) {
         std::string full_name;
         try {
-            full_name = singleton_core().get_property(device, ov::device::full_name);
+            full_name = core->get_property(device, ov::device::full_name);
         } catch (const ov::Exception&) {
             continue;  // NPU: No available devices. Ticket 172485
         }
@@ -588,7 +585,8 @@ void print_scheduler_config_info(const SchedulerConfig &scheduler_config) {
 void import_npu_model(ov::CompiledModel& compiled,
                       KVDesc& kv_desc,
                       const ov::AnyMap& config,
-                      const std::string& blob_path) {
+                      const std::string& blob_path,
+                      const std::shared_ptr<ov::Core>& core) {
     if (!std::filesystem::exists(blob_path)) {
         OPENVINO_THROW("Blob file is not found at: " + blob_path);
     }
@@ -596,7 +594,7 @@ void import_npu_model(ov::CompiledModel& compiled,
     if (!fin.is_open()) {
         OPENVINO_THROW("Blob file can't be opened: " + blob_path);
     }
-    compiled = ov::genai::utils::singleton_core().import_model(fin, "NPU", config);
+    compiled = core->import_model(fin, "NPU", config);
     kv_desc.max_prompt_len = compiled.get_property("NPUW_LLM_MAX_PROMPT_LEN").as<uint32_t>();
     kv_desc.min_response_len = compiled.get_property("NPUW_LLM_MIN_RESPONSE_LEN").as<uint32_t>();
 }
@@ -650,6 +648,7 @@ std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_impl(const std::sha
                                                                   const ov::AnyMap& config,
                                                                   const KVAxesPosition& kv_pos,
                                                                   ModelType model_type,
+                                                                  const std::shared_ptr<ov::Core>& core,
                                                                   const TextEmbeddingPipeline::Config& text_embed_config = {}) {
     ov::CompiledModel compiled;
     ov::AnyMap properties = config;
@@ -660,7 +659,7 @@ std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_impl(const std::sha
     const bool do_import = (!blob_path.empty() && !export_blob);
 
     if (do_import) {
-        import_npu_model(compiled, kv_desc, properties, blob_path);
+        import_npu_model(compiled, kv_desc, properties, blob_path, core);
     } else {
         switch (model_type) {
         case ModelType::TextEmbedding:
@@ -675,7 +674,7 @@ std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_impl(const std::sha
             break;
         }
 
-        compiled = ov::genai::utils::singleton_core().compile_model(model, "NPU", properties);
+        compiled = core->compile_model(model, "NPU", properties);
         // Also export compiled model if required
         if (export_blob) {
             if (blob_path.empty()) {
@@ -691,15 +690,17 @@ std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_impl(const std::sha
 std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu(const std::shared_ptr<ov::Model>& model,
                                                              const ov::AnyMap& config,
                                                              const KVAxesPosition& kv_pos,
+                                                             const std::shared_ptr<ov::Core>& core,
                                                              const bool is_whisper) {
-    return compile_decoder_for_npu_impl(model, config, kv_pos, is_whisper ? ModelType::Whisper : ModelType::Default);
+    return compile_decoder_for_npu_impl(model, config, kv_pos, is_whisper ? ModelType::Whisper : ModelType::Default, core);
 }
 
 std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_text_embedding(const std::shared_ptr<ov::Model>& model,
                                                                             const ov::AnyMap& config,
                                                                             const KVAxesPosition& kv_pos,
-                                                                            const TextEmbeddingPipeline::Config& text_embed_config) {
-    return compile_decoder_for_npu_impl(model, config, kv_pos, ModelType::TextEmbedding, text_embed_config);
+                                                                            const ov::genai::TextEmbeddingPipeline::Config& text_embed_config,
+                                                                            const std::shared_ptr<ov::Core>& core) {
+    return compile_decoder_for_npu_impl(model, config, kv_pos, ModelType::TextEmbedding, core, text_embed_config);
 }
 
 std::optional<ov::Any> pop_option(ov::AnyMap& config, const std::string& option_name) {
@@ -791,9 +792,9 @@ std::pair<ov::AnyMap, std::string> extract_attention_backend(const ov::AnyMap& e
     return {properties, attention_backend};
 };
 
-void release_core_plugin(const std::string& device) {
+void release_core_plugin(const std::string& device, const std::shared_ptr<ov::Core>& core) {
     try {
-        singleton_core().unload_plugin(device);
+        core->unload_plugin(device);
     } catch (const ov::Exception&) {
         // Note: in a theory it can throw an exception when 2 different pipelines are created from
         // different threads and then both of them unload plugin for 'device' from ov::Core
@@ -844,12 +845,11 @@ ov::Tensor merge_text_and_image_embeddings_llava(const ov::Tensor& input_ids, ov
     return inputs_embeds;
 }
 
-size_t get_available_gpu_memory(const std::string& device, size_t num_decoder_layers) {
+size_t get_available_gpu_memory(const std::string& device, size_t num_decoder_layers, const std::shared_ptr<ov::Core>& core) {
     OPENVINO_ASSERT(device.find("GPU") != std::string::npos, "get_available_gpu_memory() is applicable for GPU only.");
 
-    ov::Core core = utils::singleton_core();
-    auto memory_statistics = core.get_property(device, ov::intel_gpu::memory_statistics);
-    auto device_type = core.get_property(device, ov::device::type);
+    auto memory_statistics = core->get_property(device, ov::intel_gpu::memory_statistics);
+    auto device_type = core->get_property(device, ov::device::type);
 
     // sum up all used device memory
     std::vector<std::string> device_memory_types = {"cl_mem", "usm_device"};
@@ -869,10 +869,10 @@ size_t get_available_gpu_memory(const std::string& device, size_t num_decoder_la
     used_device_mem *= used_memory_threshold;
 
     // total device memory in bytes
-    auto total_device_memory = core.get_property(device, ov::intel_gpu::device_total_mem_size);
+    auto total_device_memory = core->get_property(device, ov::intel_gpu::device_total_mem_size);
 
     // max allocatable memory size on GPU
-    auto max_alloc_memory_size = core.get_property(device, ov::intel_gpu::device_max_alloc_mem_size);
+    auto max_alloc_memory_size = core->get_property(device, ov::intel_gpu::device_max_alloc_mem_size);
 
     // Total KV-cache size if a single tensor is limited by 'device_max_alloc_mem_size' property
     auto max_allocatable_kv_cache = max_alloc_memory_size * num_decoder_layers * 2;
@@ -896,10 +896,11 @@ std::pair<ov::AnyMap, std::optional<std::filesystem::path>> extract_export_prope
 
 ov::CompiledModel import_model(const std::filesystem::path& blob_path,
                                const std::string& device,
-                               const ov::AnyMap& properties) {
+                               const ov::AnyMap& properties,
+                               const std::shared_ptr<ov::Core>& core) {
     OPENVINO_ASSERT(!blob_path.empty(), "blob path is empty");
     ov::Tensor blob_tensor = ov::read_tensor_data(blob_path);
-    return ov::genai::utils::singleton_core().import_model(blob_tensor, device, properties);
+    return core->import_model(blob_tensor, device, properties);
 }
 
 void export_model(ov::CompiledModel& compiled_model, const std::filesystem::path& blob_path) {

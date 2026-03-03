@@ -752,10 +752,11 @@ ov::Tensor VisionEncoderMiniCPM::resample(const ov::Tensor& encoded_image, const
 VisionEncoderMiniCPM::VisionEncoderMiniCPM(
         const std::filesystem::path& model_dir,
         const std::string& device,
-        const ov::AnyMap properties) : VisionEncoder{model_dir, device, properties} {
+        const std::shared_ptr<ov::Core>& core,
+        const ov::AnyMap properties) : VisionEncoder{model_dir, device, core, properties} {
     m_vlm_config = utils::from_config_json_if_exists<VLMConfig>(model_dir, "config.json");
-    auto compiled_model = utils::singleton_core().compile_model(model_dir / "openvino_resampler_model.xml", device, properties);
-    ov::genai::utils::print_compiled_model_properties(compiled_model, "VLM resampler model");
+    auto compiled_model = core->compile_model(model_dir / "openvino_resampler_model.xml", device, properties);
+    ov::genai::utils::print_compiled_model_properties(compiled_model, "VLM resampler model", core);
     m_ireq_queue_resampler = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
         compiled_model.get_property(ov::optimal_number_of_infer_requests),
         [&compiled_model]() -> ov::InferRequest {
@@ -768,12 +769,13 @@ VisionEncoderMiniCPM::VisionEncoderMiniCPM(
         const ModelsMap& models_map,
         const std::filesystem::path& config_dir_path,
         const std::string& device,
-        const ov::AnyMap device_config) : VisionEncoder{models_map, config_dir_path, device, device_config} {
+        const std::shared_ptr<ov::Core>& core,
+        const ov::AnyMap device_config) : VisionEncoder{models_map, config_dir_path, device, core, device_config} {
     const auto& resampler_model = utils::get_model_weights_pair(models_map, "resampler").first;
     const auto& resampler_weights = utils::get_model_weights_pair(models_map, "resampler").second;
     m_vlm_config = utils::from_config_json_if_exists<VLMConfig>(config_dir_path, "config.json");
-    auto compiled_model = utils::singleton_core().compile_model(resampler_model, resampler_weights, device, device_config);
-    ov::genai::utils::print_compiled_model_properties(compiled_model, "VLM resampler model");
+    auto compiled_model = core->compile_model(resampler_model, resampler_weights, device, device_config);
+    ov::genai::utils::print_compiled_model_properties(compiled_model, "VLM resampler model", core);
     m_ireq_queue_resampler = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
         compiled_model.get_property(ov::optimal_number_of_infer_requests),
         [&compiled_model]() -> ov::InferRequest {
@@ -787,8 +789,9 @@ InputsEmbedderMiniCPM::InputsEmbedderMiniCPM(
     const VLMConfig& vlm_config,
     const std::filesystem::path& model_dir,
     const std::string& device,
+    const std::shared_ptr<ov::Core>& core,
     const ov::AnyMap device_config) :
-    IInputsEmbedder(vlm_config, model_dir, device, device_config) {}
+    IInputsEmbedder(vlm_config, model_dir, device, core, device_config) {}
 
 InputsEmbedderMiniCPM::InputsEmbedderMiniCPM(
     const VLMConfig& vlm_config,
@@ -796,7 +799,8 @@ InputsEmbedderMiniCPM::InputsEmbedderMiniCPM(
     const Tokenizer& tokenizer,
     const std::filesystem::path& config_dir_path,
     const std::string& device,
+    const std::shared_ptr<ov::Core>& core,
     const ov::AnyMap device_config) :
-    IInputsEmbedder(vlm_config, models_map, tokenizer, config_dir_path, device, device_config) {}
+    IInputsEmbedder(vlm_config, models_map, tokenizer, config_dir_path, device, core, device_config) {}
 
 } // namespace ov::genai

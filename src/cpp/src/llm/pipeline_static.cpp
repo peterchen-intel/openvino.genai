@@ -96,11 +96,13 @@ StatefulLLMPipeline::StatefulLLMPipeline(
     const std::filesystem::path& models_path,
     const ov::genai::Tokenizer& tokenizer,
     const ov::AnyMap& config
-): StatefulLLMPipeline(
-       genai::utils::singleton_core().read_model(models_path / "openvino_model.xml", {}, config),
-       tokenizer, config,
+): LLMPipelineImplBase(
+       tokenizer,
        utils::from_config_json_if_exists(models_path)
-   ) {
+   ),
+   m_sampler(m_tokenizer) {
+   auto model = m_ov_core->read_model(models_path / "openvino_model.xml", {}, config);
+   initialize_pipeline(model, config);
 }
 
 StatefulLLMPipeline::StatefulLLMPipeline(
@@ -110,8 +112,12 @@ StatefulLLMPipeline::StatefulLLMPipeline(
     const ov::genai::GenerationConfig& generation_config
 ) : LLMPipelineImplBase(tokenizer, generation_config),
     m_sampler(m_tokenizer) {
+    initialize_pipeline(model, properties);
+}
+
+void StatefulLLMPipeline::initialize_pipeline(const std::shared_ptr<ov::Model>& model, const ov::AnyMap& properties) {
     auto kv_pos = ov::genai::utils::get_kv_axes_pos(model);
-    auto [compiled, kv_desc] = utils::compile_decoder_for_npu(model, properties, kv_pos);
+    auto [compiled, kv_desc] = utils::compile_decoder_for_npu(model, properties, kv_pos, m_ov_core);
     m_max_prompt_len = kv_desc.max_prompt_len;
     m_kvcache_total = kv_desc.max_prompt_len + kv_desc.min_response_len;
     m_request = compiled.create_infer_request();

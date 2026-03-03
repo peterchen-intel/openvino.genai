@@ -43,7 +43,8 @@ public:
         const std::filesystem::path& models_path,
         const ov::genai::Tokenizer& tokenizer,
         const std::string& device,
-        const ov::AnyMap& plugin_config
+        const ov::AnyMap& plugin_config,
+        const std::shared_ptr<ov::Core>& core
     );
 
     StatefulLLMPipeline(
@@ -51,13 +52,15 @@ public:
         const ov::genai::Tokenizer& tokenizer,
         const std::string& device,
         const ov::AnyMap& config,
-        const ov::genai::GenerationConfig& generation_config
+        const ov::genai::GenerationConfig& generation_config,
+        const std::shared_ptr<ov::Core>& core
     );
 
     StatefulLLMPipeline(
         const std::filesystem::path& models_path,
         const std::string& device,
-        const ov::AnyMap& plugin_config
+        const ov::AnyMap& plugin_config,
+        const std::shared_ptr<ov::Core>& core
     );
 
     DecodedResults generate(
