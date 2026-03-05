@@ -35,7 +35,7 @@ ov::genai::StreamingStatus stream_generated_tokens(std::shared_ptr<ov::genai::St
 
 namespace ov::genai {
 
-Eagle3InferWrapperBase::Eagle3InferWrapperBase(const ModelDesc& model_desc)
+Eagle3InferWrapperBase::Eagle3InferWrapperBase(const ModelDesc& model_desc, const std::shared_ptr<ov::Core>& core)
     : m_device(model_desc.device),
       m_properties(model_desc.properties),
       m_tokenizer(model_desc.tokenizer),
@@ -43,12 +43,12 @@ Eagle3InferWrapperBase::Eagle3InferWrapperBase(const ModelDesc& model_desc)
     m_kv_axes_pos = utils::get_kv_axes_pos(model_desc.model);
 
     if (m_device == "NPU") {
-        auto [compiled, kv_desc] = utils::compile_decoder_for_npu(model_desc.model, m_properties, m_kv_axes_pos);
+        auto [compiled, kv_desc] = utils::compile_decoder_for_npu(model_desc.model, m_properties, m_kv_axes_pos, core);
         m_max_prompt_len = kv_desc.max_prompt_len;
         m_request = compiled.create_infer_request();
     } else {
         m_request =
-            utils::singleton_core().compile_model(model_desc.model, m_device, m_properties).create_infer_request();
+            core->compile_model(model_desc.model, m_device, m_properties).create_infer_request();
     }
 
     // Initialize performance metrics
@@ -299,7 +299,7 @@ void Eagle3InferWrapperBase::record_generated_tokens(size_t actual_generated_cou
     m_raw_perf_metrics.m_batch_sizes.emplace_back(actual_generated_count);
 }
 
-Eagle3TargetWrapper::Eagle3TargetWrapper(const ov::genai::ModelDesc& model_desc) : Eagle3InferWrapperBase(model_desc) {}
+Eagle3TargetWrapper::Eagle3TargetWrapper(const ov::genai::ModelDesc& model_desc, const std::shared_ptr<ov::Core>& core) : Eagle3InferWrapperBase(model_desc, core) {}
 
 void Eagle3TargetWrapper::initialize_sequence(const ov::Tensor& input_ids, const ov::genai::GenerationConfig& config) {
     const auto shape = input_ids.get_shape();
@@ -364,7 +364,7 @@ InferResult Eagle3TargetWrapper::forward(const InferContext& ctx) {
     return InferResult{std::move(output), std::move(sampled)};
 }
 
-Eagle3DraftWrapper::Eagle3DraftWrapper(const ov::genai::ModelDesc& model_desc) : Eagle3InferWrapperBase(model_desc) {}
+Eagle3DraftWrapper::Eagle3DraftWrapper(const ov::genai::ModelDesc& model_desc, const std::shared_ptr<ov::Core>& core) : Eagle3InferWrapperBase(model_desc, core) {}
 
 void Eagle3DraftWrapper::initialize_sequence(const ov::Tensor& input_ids, const ov::genai::GenerationConfig& config) {
     const auto shape = input_ids.get_shape();
@@ -443,8 +443,11 @@ InferResult Eagle3DraftWrapper::forward(const InferContext& ctx) {
 }
 
 StatefulEagle3LLMPipeline::StatefulEagle3LLMPipeline(const ov::genai::ModelDesc& target_model_desc,
-                                                     const ov::genai::ModelDesc& draft_model_desc)
+                                                     const ov::genai::ModelDesc& draft_model_desc,
+                                                     const std::shared_ptr<ov::Core>& core)
     : StatefulSpeculativePipelineBase(target_model_desc.tokenizer, target_model_desc.generation_config) {
+    if (core)
+        m_ov_core = core;
     // Initialize draft iterations from generation config
     ensure_num_assistant_tokens_is_set(m_generation_config);
     m_draft_iterations = m_generation_config.num_assistant_tokens;
@@ -484,7 +487,7 @@ StatefulEagle3LLMPipeline::StatefulEagle3LLMPipeline(const ov::genai::ModelDesc&
         draft_desc.properties["NPUW_LLM_MAX_GENERATION_TOKEN_LEN"] = validation_window;
         draft_desc.properties["NPUW_ONLINE_PIPELINE"] = "NONE";
     }
-    m_draft = std::make_unique<Eagle3DraftWrapper>(draft_desc);
+    m_draft = std::make_unique<Eagle3DraftWrapper>(draft_desc, core);
 
     m_draft->set_draft_target_mapping(d2t_mapping);
 
@@ -495,7 +498,7 @@ StatefulEagle3LLMPipeline::StatefulEagle3LLMPipeline(const ov::genai::ModelDesc&
         target_desc.properties["NPUW_LLM_MAX_GENERATION_TOKEN_LEN"] = validation_window;
         target_desc.properties["NPUW_SLICE_OUT"] = "NO";
     }
-    m_target = std::make_unique<Eagle3TargetWrapper>(target_desc);
+    m_target = std::make_unique<Eagle3TargetWrapper>(target_desc, core);
 }
 
 StatefulEagle3LLMPipeline::~StatefulEagle3LLMPipeline() {

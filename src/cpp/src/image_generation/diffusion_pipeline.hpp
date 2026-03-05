@@ -67,21 +67,22 @@ enum class PipelineType {
 
 class DiffusionPipeline {
 public:
-    explicit DiffusionPipeline(PipelineType pipeline_type) : m_pipeline_type(pipeline_type) {
+    explicit DiffusionPipeline(PipelineType pipeline_type, const std::shared_ptr<ov::Core>& core = nullptr)
+        : m_pipeline_type(pipeline_type), m_ov_core(core ? core : std::make_shared<ov::Core>()) {
         // TODO: support GPU as well
         const std::string device = "CPU";
 
         if (m_pipeline_type == PipelineType::IMAGE_2_IMAGE || m_pipeline_type == PipelineType::INPAINTING) {
             const bool do_normalize = true, do_binarize = false, gray_scale_source = false;
-            m_image_processor = std::make_shared<ImageProcessor>(device, do_normalize, do_binarize, gray_scale_source);
-            m_image_resizer = std::make_shared<ImageResizer>(device, ov::element::u8, "NHWC", ov::op::v11::Interpolate::InterpolateMode::BICUBIC_PILLOW);
+            m_image_processor = std::make_shared<ImageProcessor>(device, m_ov_core, do_normalize, do_binarize, gray_scale_source);
+            m_image_resizer = std::make_shared<ImageResizer>(device, m_ov_core, ov::element::u8, "NHWC", ov::op::v11::Interpolate::InterpolateMode::BICUBIC_PILLOW);
         }
 
         if (m_pipeline_type == PipelineType::INPAINTING) {
             bool do_normalize = false, do_binarize = true;
-            m_mask_processor_rgb = std::make_shared<ImageProcessor>(device, do_normalize, do_binarize, false);
-            m_mask_processor_gray = std::make_shared<ImageProcessor>(device, do_normalize, do_binarize, true);
-            m_mask_resizer = std::make_shared<ImageResizer>(device, ov::element::f32, "NCHW", ov::op::v11::Interpolate::InterpolateMode::NEAREST);
+            m_mask_processor_rgb = std::make_shared<ImageProcessor>(device, m_ov_core, do_normalize, do_binarize, false);
+            m_mask_processor_gray = std::make_shared<ImageProcessor>(device, m_ov_core, do_normalize, do_binarize, true);
+            m_mask_resizer = std::make_shared<ImageResizer>(device, m_ov_core, ov::element::f32, "NCHW", ov::op::v11::Interpolate::InterpolateMode::NEAREST);
         }
     }
 
@@ -241,6 +242,8 @@ protected:
     std::shared_ptr<AutoencoderKL> m_vae = nullptr;
     std::shared_ptr<IImageProcessor> m_image_processor = nullptr, m_mask_processor_rgb = nullptr, m_mask_processor_gray = nullptr;
     std::shared_ptr<ImageResizer> m_image_resizer = nullptr, m_mask_resizer = nullptr;
+
+    std::shared_ptr<ov::Core> m_ov_core = std::make_shared<ov::Core>();
 };
 
 } // namespace genai

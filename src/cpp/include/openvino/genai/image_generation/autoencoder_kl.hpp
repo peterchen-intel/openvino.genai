@@ -31,67 +31,78 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
-    explicit AutoencoderKL(const std::filesystem::path& vae_decoder_path);
+    explicit AutoencoderKL(const std::shared_ptr<ov::Core>& core, const std::filesystem::path& vae_decoder_path);
 
-    AutoencoderKL(const std::filesystem::path& vae_encoder_path,
+    AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                  const std::filesystem::path& vae_encoder_path,
                   const std::filesystem::path& vae_decoder_path);
 
-    AutoencoderKL(const std::filesystem::path& vae_decoder_path,
-                  const std::string& device,
-                  const ov::AnyMap& properties = {});
-
-    AutoencoderKL(const std::filesystem::path& vae_encoder_path,
+    AutoencoderKL(const std::shared_ptr<ov::Core>& core,
                   const std::filesystem::path& vae_decoder_path,
                   const std::string& device,
                   const ov::AnyMap& properties = {});
 
-    AutoencoderKL(const std::string& vae_decoder_model,
+    AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                  const std::filesystem::path& vae_encoder_path,
+                  const std::filesystem::path& vae_decoder_path,
+                  const std::string& device,
+                  const ov::AnyMap& properties = {});
+
+    AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                  const std::string& vae_decoder_model,
                   const Tensor& vae_decoder_weights,
                   const Config& vae_decoder_config);
 
-    AutoencoderKL(const std::string& vae_encoder_model,
+    AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                  const std::string& vae_encoder_model,
                   const Tensor& vae_encoder_weights,
                   const std::string& vae_decoder_model,
                   const Tensor& vae_decoder_weights,
                   const Config& vae_decoder_config);
 
-    AutoencoderKL(const std::string& vae_decoder_model,
-                  const Tensor& vae_decoder_weights,
-                  const Config& vae_decoder_config,
-                  const std::string& device,
-                  const ov::AnyMap& properties = {});
-
-    AutoencoderKL(const std::string& vae_encoder_model,
-                  const Tensor& vae_encoder_weights,
+    AutoencoderKL(const std::shared_ptr<ov::Core>& core,
                   const std::string& vae_decoder_model,
                   const Tensor& vae_decoder_weights,
                   const Config& vae_decoder_config,
                   const std::string& device,
                   const ov::AnyMap& properties = {});
 
-    template <typename... Properties,
-              typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
-    AutoencoderKL(const std::filesystem::path& vae_decoder_path,
+    AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                  const std::string& vae_encoder_model,
+                  const Tensor& vae_encoder_weights,
+                  const std::string& vae_decoder_model,
+                  const Tensor& vae_decoder_weights,
+                  const Config& vae_decoder_config,
                   const std::string& device,
-                  Properties&&... properties)
-        : AutoencoderKL(vae_decoder_path, device, ov::AnyMap{std::forward<Properties>(properties)...}) { }
+                  const ov::AnyMap& properties = {});
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
-    AutoencoderKL(const std::filesystem::path& vae_encoder_path,
+    AutoencoderKL(const std::shared_ptr<ov::Core>& core,
                   const std::filesystem::path& vae_decoder_path,
                   const std::string& device,
                   Properties&&... properties)
-        : AutoencoderKL(vae_encoder_path, vae_decoder_path, device, ov::AnyMap{std::forward<Properties>(properties)...}) { }
+        : AutoencoderKL(core, vae_decoder_path, device, ov::AnyMap{std::forward<Properties>(properties)...}) { }
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
-    AutoencoderKL(const std::string& vae_decoder_model,
+    AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                  const std::filesystem::path& vae_encoder_path,
+                  const std::filesystem::path& vae_decoder_path,
+                  const std::string& device,
+                  Properties&&... properties)
+        : AutoencoderKL(core, vae_encoder_path, vae_decoder_path, device, ov::AnyMap{std::forward<Properties>(properties)...}) { }
+
+    template <typename... Properties,
+              typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
+    AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                  const std::string& vae_decoder_model,
                   const Tensor& vae_decoder_weights,
                   const Config& vae_decoder_config,
                   const std::string& device,
                   Properties&&... properties)
-        : AutoencoderKL(vae_decoder_model,
+        : AutoencoderKL(core,
+                        vae_decoder_model,
                         vae_decoder_weights,
                         vae_decoder_config,
                         device,
@@ -99,14 +110,16 @@ public:
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
-    AutoencoderKL(const std::string& vae_encoder_model,
+    AutoencoderKL(const std::shared_ptr<ov::Core>& core,
+                  const std::string& vae_encoder_model,
                   const Tensor& vae_encoder_weights,
                   const std::string& vae_decoder_model,
                   const Tensor& vae_decoder_weights,
                   const Config& vae_decoder_config,
                   const std::string& device,
                   Properties&&... properties)
-        : AutoencoderKL(vae_encoder_model,
+        : AutoencoderKL(core,
+                        vae_encoder_model,
                         vae_encoder_weights,
                         vae_decoder_model,
                         vae_decoder_weights,
@@ -150,6 +163,7 @@ private:
     void import_model(const std::filesystem::path& blob_path, const std::string& device, const ov::AnyMap& properties = {});
 
     Config m_config;
+    std::shared_ptr<ov::Core> m_core;
     ov::InferRequest m_encoder_request, m_decoder_request;
     std::shared_ptr<ov::Model> m_encoder_model = nullptr, m_decoder_model = nullptr;
 };

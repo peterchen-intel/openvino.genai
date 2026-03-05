@@ -31,11 +31,14 @@ public:
         const Tokenizer& tokenizer,
         const SchedulerConfig& scheduler_config,
         const std::string& device,
-        const ov::AnyMap& plugin_config
+        const ov::AnyMap& plugin_config,
+        const std::shared_ptr<ov::Core>& core
         ): LLMPipelineImplBase{tokenizer, GenerationConfig()} {
+        if (core)
+            m_ov_core = core;
         auto mutable_plugin_config = plugin_config;
         mutable_plugin_config["sampler_num_threads"] = 1;
-        m_impl = std::make_unique<ContinuousBatchingPipeline>(models_path, tokenizer, scheduler_config, device, mutable_plugin_config);
+        m_impl = std::make_unique<ContinuousBatchingPipeline>(models_path, tokenizer, scheduler_config, device, mutable_plugin_config, core);
         m_generation_config = m_impl->get_config();
         }
 
@@ -46,22 +49,28 @@ public:
         const SchedulerConfig& scheduler_config,
         const std::string& device,
         const ov::AnyMap& plugin_config,
-        const ov::genai::GenerationConfig& generation_config
+        const ov::genai::GenerationConfig& generation_config,
+        const std::shared_ptr<ov::Core>& core
     ): LLMPipelineImplBase{tokenizer, GenerationConfig()} {
+        if (core)
+            m_ov_core = core;
         auto mutable_plugin_config = plugin_config;
         mutable_plugin_config["sampler_num_threads"] = 1;
-        m_impl = std::make_unique<ContinuousBatchingPipeline>(model_str, weights_tensor, tokenizer, scheduler_config, device, mutable_plugin_config, generation_config);
+        m_impl = std::make_unique<ContinuousBatchingPipeline>(model_str, weights_tensor, tokenizer, scheduler_config, device, mutable_plugin_config, generation_config, core);
     }
 
     ContinuousBatchingAdapter(
         const std::filesystem::path& models_path,
         const SchedulerConfig& scheduler_config,
         const std::string& device,
-        const ov::AnyMap& plugin_config
+        const ov::AnyMap& plugin_config,
+        const std::shared_ptr<ov::Core>& core
     ): LLMPipelineImplBase{Tokenizer(models_path, plugin_config), GenerationConfig()} {
+        if (core)
+            m_ov_core = core;
         auto mutable_plugin_config = plugin_config;
         mutable_plugin_config["sampler_num_threads"] = 1;
-        m_impl = std::make_unique<ContinuousBatchingPipeline>(models_path, m_tokenizer, scheduler_config, device, mutable_plugin_config);
+        m_impl = std::make_unique<ContinuousBatchingPipeline>(models_path, m_tokenizer, scheduler_config, device, mutable_plugin_config, core);
         m_generation_config = m_impl->get_config();
     }
 

@@ -132,15 +132,15 @@ void apply_slice_before_matmul_transformation(std::shared_ptr<ov::Model> model);
 
 void apply_gather_before_matmul_transformation(std::shared_ptr<ov::Model> model);
 
-ov::Core& singleton_core();
+
 
 std::pair<ov::AnyMap, bool> extract_gguf_properties(const ov::AnyMap& external_properties);
 
 std::pair<ov::AnyMap, bool> extract_paired_input_props(const ov::AnyMap& external_properties);
 
-std::shared_ptr<ov::Model> read_model(const std::filesystem::path& model_dir,  const ov::AnyMap& config);
+std::shared_ptr<ov::Model> read_model(const std::filesystem::path& model_dir, const ov::AnyMap& config, const std::shared_ptr<ov::Core>& core);
 
-void release_core_plugin(const std::string& device);
+void release_core_plugin(const std::string& device, const std::shared_ptr<ov::Core>& core);
 
 size_t get_first_history_difference(const ov::Tensor& encoded_history, const std::vector<int64_t> tokenized_history);
 
@@ -179,7 +179,7 @@ ov::Tensor push_front_inputs(const ov::Tensor& base_tensor, int64_t add_to_front
 
 bool env_setup_for_print_debug_info();
 
-void print_compiled_model_properties(ov::CompiledModel& compiled_Model, const char* model_title);
+void print_compiled_model_properties(ov::CompiledModel& compiled_Model, const char* model_title, const std::shared_ptr<ov::Core>& core);
 
 void print_gguf_debug_info(const std::string& debug_info);
 
@@ -193,12 +193,14 @@ struct KVDesc {
 std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu(const std::shared_ptr<ov::Model>& model,
                                                              const ov::AnyMap& config,
                                                              const KVAxesPosition& kv_pos,
+                                                             const std::shared_ptr<ov::Core>& core,
                                                              const bool is_whisper = false);
 
 std::pair<ov::CompiledModel, KVDesc> compile_decoder_for_npu_text_embedding(const std::shared_ptr<ov::Model>& model,
                                                                             const ov::AnyMap& config,
                                                                             const KVAxesPosition& kv_pos,
-                                                                            const ov::genai::TextEmbeddingPipeline::Config& text_embed_config);
+                                                                            const ov::genai::TextEmbeddingPipeline::Config& text_embed_config,
+                                                                            const std::shared_ptr<ov::Core>& core);
 
 /// @brief SharedOptional is a wrapper around a reference to an existing object and an optional shared alternative value.
 /// The difference from std::optional is that the default state is not empty and contains a reference to an existing object outside the class.
@@ -296,7 +298,7 @@ void save_openvino_model(const std::shared_ptr<ov::Model>& model, const std::str
 
 ov::Tensor merge_text_and_image_embeddings_llava(const ov::Tensor& input_ids, ov::Tensor& text_embeds, const std::vector<ov::Tensor>& image_embeds, int64_t image_token_id);
 
-size_t get_available_gpu_memory(const std::string& device, size_t num_decoder_layers);
+size_t get_available_gpu_memory(const std::string& device, size_t num_decoder_layers, const std::shared_ptr<ov::Core>& core);
 
 /**
  * @brief Extracts and removes blob import/export related properties from the provided map.
@@ -308,7 +310,8 @@ std::pair<ov::AnyMap, std::optional<std::filesystem::path>> extract_export_prope
  */
 ov::CompiledModel import_model(const std::filesystem::path& blob_path,
                                const std::string& device,
-                               const ov::AnyMap& properties);
+                               const ov::AnyMap& properties,
+                               const std::shared_ptr<ov::Core>& core);
 
 /**
  * @brief Exports a compiled model to a blob file for later use with import_model.

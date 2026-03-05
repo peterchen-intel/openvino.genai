@@ -28,16 +28,18 @@ UNet2DConditionModel::Config::Config(const std::filesystem::path& config_path) {
     read_json_param(data, "time_cond_proj_dim", time_cond_proj_dim);
 }
 
-UNet2DConditionModel::UNet2DConditionModel(const std::filesystem::path& root_dir) :
-    m_config(root_dir / "config.json") {
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+UNet2DConditionModel::UNet2DConditionModel(const std::shared_ptr<ov::Core>& core,
+                                           const std::filesystem::path& root_dir) :
+    m_config(root_dir / "config.json"), m_core(core) {
+    m_model = m_core->read_model(root_dir / "openvino_model.xml");
     m_vae_scale_factor = get_vae_scale_factor(root_dir.parent_path() / "vae_decoder" / "config.json");
 }
 
-UNet2DConditionModel::UNet2DConditionModel(const std::filesystem::path& root_dir,
+UNet2DConditionModel::UNet2DConditionModel(const std::shared_ptr<ov::Core>& core,
+                                           const std::filesystem::path& root_dir,
                                            const std::string& device,
                                            const ov::AnyMap& properties)
-    : m_config(root_dir / "config.json") {
+    : m_config(root_dir / "config.json"), m_core(core) {
     m_vae_scale_factor = get_vae_scale_factor(root_dir.parent_path() / "vae_decoder" / "config.json");
 
     const auto [properties_without_blob, blob_path] = utils::extract_export_properties(properties);
@@ -47,25 +49,27 @@ UNet2DConditionModel::UNet2DConditionModel(const std::filesystem::path& root_dir
         return;
     }
 
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+    m_model = m_core->read_model(root_dir / "openvino_model.xml");
     compile(device, properties_without_blob);
 }
 
-UNet2DConditionModel::UNet2DConditionModel(const std::string& model,
+UNet2DConditionModel::UNet2DConditionModel(const std::shared_ptr<ov::Core>& core,
+                                           const std::string& model,
                                            const Tensor& weights,
                                            const Config& config,
                                            const size_t vae_scale_factor) :
-    m_config(config), m_vae_scale_factor(vae_scale_factor) {
-    m_model = utils::singleton_core().read_model(model, weights);
+    m_config(config), m_core(core), m_vae_scale_factor(vae_scale_factor) {
+    m_model = m_core->read_model(model, weights);
 }
 
-UNet2DConditionModel::UNet2DConditionModel(const std::string& model,
+UNet2DConditionModel::UNet2DConditionModel(const std::shared_ptr<ov::Core>& core,
+                                           const std::string& model,
                                            const Tensor& weights,
                                            const Config& config,
                                            const size_t vae_scale_factor,
                                            const std::string& device,
                                            const ov::AnyMap& properties) :
-    UNet2DConditionModel(model, weights, config, vae_scale_factor) {
+    UNet2DConditionModel(core, model, weights, config, vae_scale_factor) {
     compile(device, properties);
 }
 
@@ -115,7 +119,7 @@ UNet2DConditionModel& UNet2DConditionModel::compile(const std::string& device, c
         adapters->set_tensor_name_prefix(adapters->get_tensor_name_prefix().value_or("lora_unet"));
         m_adapter_controller = AdapterController(m_model, *adapters, device);
     }
-    m_impl->compile(m_model, device, *filtered_properties);
+    m_impl->compile(m_model, device, *filtered_properties, m_core);
 
     // release the original model
     m_model.reset();
@@ -132,7 +136,7 @@ void UNet2DConditionModel::import_model(const std::filesystem::path& blob_path, 
         m_impl = std::make_shared<UNet2DConditionModel::UNetInferenceDynamic>();
     }
 
-    m_impl->import_model(blob_path, device, properties);
+    m_impl->import_model(blob_path, device, properties, m_core);
 }
 
 void UNet2DConditionModel::set_hidden_states(const std::string& tensor_name, ov::Tensor encoder_hidden_states) {

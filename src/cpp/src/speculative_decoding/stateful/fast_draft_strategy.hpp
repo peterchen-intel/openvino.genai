@@ -14,7 +14,7 @@ namespace genai {
 
 class LLMInferWrapper {
 public:
-    LLMInferWrapper(const ov::genai::ModelDesc& model_desc);
+    LLMInferWrapper(const ov::genai::ModelDesc& model_desc, const std::shared_ptr<ov::Core>& core);
 
     std::string device() const;
 
@@ -81,7 +81,8 @@ class StatefulSpeculativeLLMPipeline : public StatefulSpeculativePipelineBase {
 public:
     StatefulSpeculativeLLMPipeline(
     const ov::genai::ModelDesc& main_model_desc, 
-    const ov::genai::ModelDesc& draft_model_desc
+    const ov::genai::ModelDesc& draft_model_desc,
+    const std::shared_ptr<ov::Core>& core
     );
 
     ~StatefulSpeculativeLLMPipeline();

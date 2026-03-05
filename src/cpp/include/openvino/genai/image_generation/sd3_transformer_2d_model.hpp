@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "openvino/core/any.hpp"
 #include "openvino/runtime/infer_request.hpp"
@@ -28,18 +29,21 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
-    explicit SD3Transformer2DModel(const std::filesystem::path& root_dir);
+    explicit SD3Transformer2DModel(const std::shared_ptr<ov::Core>& core, const std::filesystem::path& root_dir);
 
-    SD3Transformer2DModel(const std::filesystem::path& root_dir,
+    SD3Transformer2DModel(const std::shared_ptr<ov::Core>& core,
+                          const std::filesystem::path& root_dir,
                           const std::string& device,
                           const ov::AnyMap& properties = {});
 
-    SD3Transformer2DModel(const std::string& model,
+    SD3Transformer2DModel(const std::shared_ptr<ov::Core>& core,
+                          const std::string& model,
                           const Tensor& weights,
                           const Config& config,
                           const size_t vae_scale_factor);
 
-    SD3Transformer2DModel(const std::string& model,
+    SD3Transformer2DModel(const std::shared_ptr<ov::Core>& core,
+                          const std::string& model,
                           const Tensor& weights,
                           const Config& config,
                           const size_t vae_scale_factor,
@@ -48,18 +52,22 @@ public:
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
-    SD3Transformer2DModel(const std::filesystem::path& root_dir, const std::string& device, Properties&&... properties)
-        : SD3Transformer2DModel(root_dir, device, ov::AnyMap{std::forward<Properties>(properties)...}) {}
+    SD3Transformer2DModel(const std::shared_ptr<ov::Core>& core,
+                          const std::filesystem::path& root_dir,
+                          const std::string& device,
+                          Properties&&... properties)
+        : SD3Transformer2DModel(core, root_dir, device, ov::AnyMap{std::forward<Properties>(properties)...}) {}
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
-    SD3Transformer2DModel(const std::string& model,
+    SD3Transformer2DModel(const std::shared_ptr<ov::Core>& core,
+                          const std::string& model,
                           const Tensor& weights,
                           const Config& config,
                           const size_t vae_scale_factor,
                           const std::string& device,
                           Properties&&... properties)
-        : SD3Transformer2DModel(model, weights, config, vae_scale_factor, device, ov::AnyMap{std::forward<Properties>(properties)...}) {}
+        : SD3Transformer2DModel(core, model, weights, config, vae_scale_factor, device, ov::AnyMap{std::forward<Properties>(properties)...}) {}
 
     SD3Transformer2DModel(const SD3Transformer2DModel&);
 
@@ -88,6 +96,7 @@ private:
     std::shared_ptr<Inference> m_impl;
 
     Config m_config;
+    std::shared_ptr<ov::Core> m_core;
     ov::InferRequest m_request;
     std::shared_ptr<ov::Model> m_model;
     size_t m_vae_scale_factor;

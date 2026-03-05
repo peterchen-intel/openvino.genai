@@ -26,11 +26,12 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
-    explicit LTXVideoTransformer3DModel(const std::filesystem::path& root_dir);
+    explicit LTXVideoTransformer3DModel(const std::filesystem::path& root_dir, const std::shared_ptr<ov::Core>& core = nullptr);
 
     LTXVideoTransformer3DModel(const std::filesystem::path& root_dir,
                           const std::string& device,
-                          const ov::AnyMap& properties = {});
+                          const ov::AnyMap& properties = {},
+                          const std::shared_ptr<ov::Core>& core = nullptr);
 
     LTXVideoTransformer3DModel(const LTXVideoTransformer3DModel&);
 
@@ -60,6 +61,7 @@ private:
     Config m_config;
     ov::InferRequest m_request;
     std::shared_ptr<ov::Model> m_model;
+    std::shared_ptr<ov::Core> m_core;
     size_t m_expected_batch_size = 0;
     int64_t m_spatial_compression_ratio, m_temporal_compression_ratio; // calculated based on vae config, needed for reshape
 

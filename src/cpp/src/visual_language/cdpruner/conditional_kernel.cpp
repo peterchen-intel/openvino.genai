@@ -16,23 +16,26 @@
 
 namespace ov::genai::cdpruner {
 
-ConditionalKernelBuilder::ConditionalKernelBuilder(const Config& config)
+ConditionalKernelBuilder::ConditionalKernelBuilder(const Config& config, const std::shared_ptr<ov::Core>& core)
     : m_config(config),
       m_requests_initialized(false) {
     // Precompile models and create infer requests for performance optimization
     try {
-        ov::Core core;
+        std::shared_ptr<ov::Core> core_ptr = core;
+        if (!core_ptr) {
+            core_ptr = std::make_shared<ov::Core>();
+        }
 
         // Compile and create infer request for conditional kernel model
         auto kernel_model = create_conditional_kernel_model();
         ov::CompiledModel compiled_kernel_model;
-        compiled_kernel_model = core.compile_model(kernel_model, m_config.device);
+        compiled_kernel_model = core_ptr->compile_model(kernel_model, m_config.device);
         m_conditional_kernel_infer_request = compiled_kernel_model.create_infer_request();
 
         // Always compile similarity matrix model for potential GPU acceleration
         auto similarity_model = create_similarity_matrix_model();
         ov::CompiledModel compiled_similarity_model;
-        compiled_similarity_model = core.compile_model(similarity_model, m_config.device);
+        compiled_similarity_model = core_ptr->compile_model(similarity_model, m_config.device);
         m_similarity_infer_request = compiled_similarity_model.create_infer_request();
 
         m_requests_initialized = true;

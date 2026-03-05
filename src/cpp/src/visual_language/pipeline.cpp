@@ -84,8 +84,9 @@ public:
     VLMPipelineImpl(
         const std::filesystem::path& models_dir,
         const std::string& device,
-        const ov::AnyMap& properties
-    ) :
+        const ov::AnyMap& properties,
+        const std::shared_ptr<ov::Core>& core = nullptr
+    ) : VLMPipelineBase(core),
         m_generation_config{
             utils::from_config_json_if_exists<GenerationConfig>(
                 models_dir, "generation_config.json"
@@ -95,7 +96,7 @@ public:
 
         auto properties_copy = properties;
         auto language_model_path = models_dir / "openvino_language_model.xml";
-        auto language_model =  utils::singleton_core().read_model(language_model_path, {}, properties_copy);
+        auto language_model =  m_ov_core->read_model(language_model_path, {}, properties_copy);
         auto kv_pos = ov::genai::utils::get_kv_axes_pos(language_model);
 
         // In case user provided properties per-device
@@ -122,7 +123,7 @@ public:
             m_max_kv_cache_size = kv_desc.max_prompt_len + kv_desc.min_response_len;
             npu_auto_default_properties(device_properties);
         } else {
-            compiled_language_model = utils::singleton_core().compile_model(language_model, device, lm_properties);
+            compiled_language_model = m_ov_core->compile_model(language_model, device, lm_properties);
         }
         ov::genai::utils::print_compiled_model_properties(compiled_language_model, "VLM language model");
 
@@ -160,8 +161,9 @@ public:
         const std::filesystem::path& config_dir_path,
         const std::string& device,
         const ov::AnyMap& properties,
-        const GenerationConfig& generation_config
-    ) :
+        const GenerationConfig& generation_config,
+        const std::shared_ptr<ov::Core>& core = nullptr
+    ) : VLMPipelineBase(core),
         m_generation_config{generation_config} {
         m_is_npu = device.find("NPU") != std::string::npos;
         OPENVINO_ASSERT(!m_is_npu,
@@ -173,7 +175,7 @@ public:
         m_embedding = m_inputs_embedder->get_embedding_model();
 
         auto m_language_pair = utils::get_model_weights_pair(models_map, "language");
-        m_language = utils::singleton_core().compile_model(
+        m_language = m_ov_core->compile_model(
             m_language_pair.first, m_language_pair.second, device, properties
         ).create_infer_request();
 
@@ -628,7 +630,8 @@ bool requires_sdpa(const std::filesystem::path& models_dir) {
 VLMPipeline::VLMPipeline(
     const std::filesystem::path& models_dir,
     const std::string& device,
-    const ov::AnyMap& user_properties
+    const ov::AnyMap& user_properties,
+    const std::shared_ptr<ov::Core>& core
 ) {
     auto start_time = std::chrono::steady_clock::now();
 
@@ -637,12 +640,12 @@ VLMPipeline::VLMPipeline(
     if (device == "NPU") {
         auto it = properties.find("scheduler_config");
         OPENVINO_ASSERT(it == properties.end(), "scheduler_config should be removed for VLMPipeline initialization");
-        m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, device, properties);
+        m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, device, properties, core);
     } else {
         // If CB is invoked explicitly, create CB adapter as is and re-throw in case if internal issues
         if (utils::explicitly_requires_paged_attention(user_properties)) {
             auto [plugin_properties, scheduler_config] = utils::extract_scheduler_config(properties, utils::get_latency_oriented_scheduler_config());
-            m_pimpl = std::make_unique<VLMContinuousBatchingAdapter>(models_dir, scheduler_config, device, plugin_properties);
+            m_pimpl = std::make_unique<VLMContinuousBatchingAdapter>(models_dir, scheduler_config, device, plugin_properties, core);
         } else if (attention_backend == PA_BACKEND && !requires_sdpa(models_dir)) {
             // try to call CB adapter one more time, but with safe guard to silent exception
             try {
@@ -650,7 +653,7 @@ VLMPipeline::VLMPipeline(
                 // we need use CB only for x86 and arm64, as for other architectures like risc-v we can create Paged Attention based model
                 // but cannot perform its inference later
     #if defined(OPENVINO_ARCH_X86_64) || defined(OPENVINO_ARCH_ARM64)
-                m_pimpl = std::make_unique<VLMContinuousBatchingAdapter>(models_dir, scheduler_config, device, plugin_properties);
+                m_pimpl = std::make_unique<VLMContinuousBatchingAdapter>(models_dir, scheduler_config, device, plugin_properties, core);
     #endif
             } catch (ov::Exception&) {
                 // ignore exceptions from PA
@@ -658,7 +661,7 @@ VLMPipeline::VLMPipeline(
         }
 
         if (m_pimpl == nullptr) {
-            m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, device, properties);
+            m_pimpl = std::make_unique<VLMPipelineImpl>(models_dir, device, properties, core);
         }
     }
 
@@ -672,7 +675,8 @@ VLMPipeline::VLMPipeline(
     const std::filesystem::path& config_dir_path,
     const std::string& device,
     const ov::AnyMap& user_properties,
-    const GenerationConfig& generation_config
+    const GenerationConfig& generation_config,
+    const std::shared_ptr<ov::Core>& core
 ) {
     auto start_time = std::chrono::steady_clock::now();
 
@@ -681,12 +685,12 @@ VLMPipeline::VLMPipeline(
     if (device == "NPU") {
         auto it = properties.find("scheduler_config");
         OPENVINO_ASSERT(it == properties.end(), "scheduler_config should be removed for VLMPipeline initialization");
-        m_pimpl = std::make_unique<VLMPipelineImpl>(models_map, tokenizer, config_dir_path, device, properties, generation_config);
+        m_pimpl = std::make_unique<VLMPipelineImpl>(models_map, tokenizer, config_dir_path, device, properties, generation_config, core);
     } else {
         // If CB is invoked explicitly, create CB adapter as is and re-throw in case if internal issues
         if (utils::explicitly_requires_paged_attention(user_properties)) {
             auto [plugin_properties, scheduler_config] = utils::extract_scheduler_config(properties, utils::get_latency_oriented_scheduler_config());
-            m_pimpl = std::make_unique<VLMContinuousBatchingAdapter>(models_map, tokenizer, config_dir_path, scheduler_config, device, plugin_properties, generation_config);
+            m_pimpl = std::make_unique<VLMContinuousBatchingAdapter>(models_map, tokenizer, config_dir_path, scheduler_config, device, plugin_properties, generation_config, core);
         } else if (attention_backend == PA_BACKEND && !requires_sdpa(config_dir_path)) {
             // try to call CB adapter one more time, but with safe guard to silent exception
             try {
@@ -694,7 +698,7 @@ VLMPipeline::VLMPipeline(
                 // we need use CB only for x86 and arm64, as for other architectures like risc-v we can create Paged Attention based model
                 // but cannot perform its inference later
     #if defined(OPENVINO_ARCH_X86_64) || defined(OPENVINO_ARCH_ARM64)
-                m_pimpl = std::make_unique<VLMContinuousBatchingAdapter>(models_map, tokenizer, config_dir_path, scheduler_config, device, plugin_properties, generation_config);
+                m_pimpl = std::make_unique<VLMContinuousBatchingAdapter>(models_map, tokenizer, config_dir_path, scheduler_config, device, plugin_properties, generation_config, core);
     #endif
             } catch (ov::Exception&) {
                 // ignore exceptions from PA
@@ -702,7 +706,7 @@ VLMPipeline::VLMPipeline(
         }
 
         if (m_pimpl == nullptr) {
-            m_pimpl = std::make_unique<VLMPipelineImpl>(models_map, tokenizer, config_dir_path, device, properties, generation_config);
+            m_pimpl = std::make_unique<VLMPipelineImpl>(models_map, tokenizer, config_dir_path, device, properties, generation_config, core);
         }
 
     }

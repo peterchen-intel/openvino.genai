@@ -28,18 +28,21 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
-    explicit CLIPTextModel(const std::filesystem::path& root_dir);
+    explicit CLIPTextModel(const std::shared_ptr<ov::Core>& core, const std::filesystem::path& root_dir);
 
-    CLIPTextModel(const std::filesystem::path& root_dir,
+    CLIPTextModel(const std::shared_ptr<ov::Core>& core,
+                  const std::filesystem::path& root_dir,
                   const std::string& device,
                   const ov::AnyMap& properties = {});
 
-    CLIPTextModel(const std::string& model,
+    CLIPTextModel(const std::shared_ptr<ov::Core>& core,
+                  const std::string& model,
                   const Tensor& weights,
                   const Config& config,
                   const Tokenizer& clip_tokenizer);
 
-    CLIPTextModel(const std::string& model,
+    CLIPTextModel(const std::shared_ptr<ov::Core>& core,
+                  const std::string& model,
                   const Tensor& weights,
                   const Config& config,
                   const Tokenizer& clip_tokenizer,
@@ -48,20 +51,23 @@ public:
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
-    CLIPTextModel(const std::filesystem::path& root_dir,
+    CLIPTextModel(const std::shared_ptr<ov::Core>& core,
+                  const std::filesystem::path& root_dir,
                   const std::string& device,
                   Properties&&... properties)
-        : CLIPTextModel(root_dir, device, ov::AnyMap{std::forward<Properties>(properties)...}) { }
+        : CLIPTextModel(core, root_dir, device, ov::AnyMap{std::forward<Properties>(properties)...}) { }
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
-    CLIPTextModel(const std::string& model,
+    CLIPTextModel(const std::shared_ptr<ov::Core>& core,
+                  const std::string& model,
                   const Tensor& weights,
                   const Config& config,
                   const Tokenizer& clip_tokenizer,
                   const std::string& device,
                   Properties&&... properties)
-        : CLIPTextModel(model,
+        : CLIPTextModel(core,
+                        model,
                         weights,
                         config,
                         clip_tokenizer,
@@ -101,6 +107,7 @@ public:
 
 private:
     Config m_config;
+    std::shared_ptr<ov::Core> m_core;
     AdapterController m_adapter_controller;
     Tokenizer m_clip_tokenizer;
     bool m_slice_batch1_output = false;

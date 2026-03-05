@@ -27,6 +27,9 @@ public:
 
     virtual SpeechGenerationPerfMetrics get_performance_metrics();
 
+    Text2SpeechPipelineImpl(const std::shared_ptr<ov::Core>& core = nullptr)
+        : m_ov_core(core ? core : std::make_shared<ov::Core>()) {}
+
     virtual ~Text2SpeechPipelineImpl() = default;
 
 protected:
@@ -35,6 +38,8 @@ protected:
     GenerationConfig m_generation_config;
     float m_load_time_ms = 0.0f;
     SpeechGenerationPerfMetrics m_perf_metrics;
+
+    std::shared_ptr<ov::Core> m_ov_core = std::make_shared<ov::Core>();
 };
 
 }  // namespace genai

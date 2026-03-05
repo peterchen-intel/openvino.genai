@@ -64,6 +64,8 @@ public:
     ~StatefulLLMPipeline();
 
 private:
+    void initialize_pipeline(const std::shared_ptr<ov::Model>& model, const ov::AnyMap& properties);
+
     uint32_t m_max_prompt_len = 0u;
     uint32_t m_kvcache_total = 0u;
     ov::InferRequest m_request;

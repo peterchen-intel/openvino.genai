@@ -119,7 +119,8 @@ public:
      */
     WhisperPipeline(const std::filesystem::path& models_path,
                     const std::string& device,
-                    const ov::AnyMap& properties = {});
+                    const ov::AnyMap& properties = {},
+                    const std::shared_ptr<ov::Core>& core = nullptr);
 
     /**
      * @brief Constructs a WhisperPipeline from xml/bin files, tokenizers and configuration in the

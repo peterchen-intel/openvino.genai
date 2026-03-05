@@ -17,12 +17,15 @@ public:
         const std::filesystem::path& models_dir,
         const SchedulerConfig& scheduler_config,
         const std::string& device,
-        const ov::AnyMap& properties
-    ): m_impl{
+        const ov::AnyMap& properties,
+        const std::shared_ptr<ov::Core>& core = nullptr
+    ): VLMPipelineBase(core), m_impl{
         models_dir, 
+        ov::genai::Tokenizer(models_dir, properties),
         scheduler_config, 
         device, 
-        properties} { }
+        properties,
+        core} { }
 
     VLMContinuousBatchingAdapter(
         const ModelsMap& models_map,
@@ -31,15 +34,17 @@ public:
         const SchedulerConfig& scheduler_config,
         const std::string& device,
         const ov::AnyMap& properties,
-        const ov::genai::GenerationConfig& generation_config
-    ): m_impl{
+        const ov::genai::GenerationConfig& generation_config,
+        const std::shared_ptr<ov::Core>& core = nullptr
+    ): VLMPipelineBase(core), m_impl{
         models_map,
         tokenizer,
         scheduler_config,
         device,
         config_dir_path,
         properties,
-        generation_config} {
+        generation_config,
+        core} {
     }
 
     VLMDecodedResults generate(

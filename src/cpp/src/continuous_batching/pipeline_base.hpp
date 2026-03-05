@@ -64,6 +64,8 @@ protected:
     // to access m_load_time_ms
     friend class ContinuousBatchingPipeline;
 
+    std::shared_ptr<ov::Core> m_ov_core = std::make_shared<ov::Core>();
+
     ModelInputType m_model_input_type = ModelInputType::TOKENS;
     std::shared_ptr<InputsEmbedder> m_inputs_embedder;
     std::mutex m_embeddings_mutex;

@@ -44,14 +44,16 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline( const std::filesystem::p
                                                         const std::string& device,
                                                         const ov::AnyMap& properties,
                                                         const ov::AnyMap& tokenizer_properties,
-                                                        const ov::AnyMap& vision_encoder_properties) {
+                                                        const ov::AnyMap& vision_encoder_properties,
+                                                        const std::shared_ptr<ov::Core>& core) {
+    m_ov_core = core ? core : std::make_shared<ov::Core>();
     auto start_time = std::chrono::steady_clock::now();
     auto properties_without_draft_model = properties;
     auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
     auto is_prompt_lookup_enabled = extract_prompt_lookup_from_config(properties_without_draft_model);
     auto eagle_rt_info = utils::eagle3::extract_eagle3_info_from_config(draft_model_desr.properties, models_path);
 
-    auto model = utils::read_model(models_path, properties);
+    auto model = utils::read_model(models_path, properties, m_ov_core);
     auto [properties_without_draft_model_without_gguf, enable_save_ov_model] = utils::extract_gguf_properties(properties_without_draft_model);
     properties_without_draft_model_without_gguf[ov::cache_model_path.name()] = models_path;
     auto tokenizer = ov::genai::Tokenizer(models_path, tokenizer_properties);
@@ -80,10 +82,10 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline( const std::filesystem::p
         auto main_model_descr = ov::genai::ModelDesc(model, tokenizer, device, properties_without_draft_model_without_gguf, scheduler_config, generation_config);
         m_impl = std::make_shared<SpeculativeDecodingImpl>(main_model_descr, draft_model_desr);
     } else if (embedder) {
-        m_impl = std::make_shared<ContinuousBatchingImpl>(model, embedder, tokenizer, scheduler_config, device, properties_without_draft_model_without_gguf, generation_config);
+        m_impl = std::make_shared<ContinuousBatchingImpl>(model, embedder, tokenizer, scheduler_config, device, properties_without_draft_model_without_gguf, generation_config, m_ov_core);
     }
     else {
-        m_impl = std::make_shared<ContinuousBatchingImpl>(model, tokenizer, scheduler_config, device, properties_without_draft_model_without_gguf, generation_config);
+        m_impl = std::make_shared<ContinuousBatchingImpl>(model, tokenizer, scheduler_config, device, properties_without_draft_model_without_gguf, generation_config, m_ov_core);
     }
 
     m_impl->m_load_time_ms = get_load_time(start_time);
@@ -94,13 +96,15 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
     const Tokenizer& tokenizer,
     const SchedulerConfig& scheduler_config,
     const std::string& device,
-    const ov::AnyMap& properties) {
+    const ov::AnyMap& properties,
+    const std::shared_ptr<ov::Core>& core) {
+    m_ov_core = core ? core : std::make_shared<ov::Core>();
     auto start_time = std::chrono::steady_clock::now();
     auto properties_without_draft_model = properties;
     auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
     auto is_prompt_lookup_enabled = extract_prompt_lookup_from_config(properties_without_draft_model);
     auto eagle_rt_info = utils::eagle3::extract_eagle3_info_from_config(draft_model_desr.properties, models_path);
-    auto model = utils::read_model(models_path, properties_without_draft_model);
+    auto model = utils::read_model(models_path, properties_without_draft_model, m_ov_core);
     auto [properties_without_draft_model_without_gguf, enable_save_ov_model] = utils::extract_gguf_properties(properties_without_draft_model);
     properties_without_draft_model_without_gguf[ov::cache_model_path.name()] = models_path;
 
@@ -128,9 +132,9 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
         auto main_model_descr = ov::genai::ModelDesc(model, tokenizer, device, properties_without_draft_model_without_gguf, scheduler_config, generation_config);
         m_impl = std::make_shared<SpeculativeDecodingImpl>(main_model_descr, draft_model_desr);
     } else if (embedder) {
-        m_impl = std::make_shared<ContinuousBatchingImpl>(model, embedder, tokenizer, scheduler_config, device, properties_without_draft_model_without_gguf, generation_config);
+        m_impl = std::make_shared<ContinuousBatchingImpl>(model, embedder, tokenizer, scheduler_config, device, properties_without_draft_model_without_gguf, generation_config, m_ov_core);
     } else {
-        m_impl = std::make_shared<ContinuousBatchingImpl>(model, tokenizer, scheduler_config, device, properties_without_draft_model_without_gguf, generation_config);
+        m_impl = std::make_shared<ContinuousBatchingImpl>(model, tokenizer, scheduler_config, device, properties_without_draft_model_without_gguf, generation_config, m_ov_core);
     }
 
     m_impl->m_load_time_ms = get_load_time(start_time);
@@ -143,14 +147,16 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
     const SchedulerConfig& scheduler_config,
     const std::string& device,
     const ov::AnyMap& properties,
-    const ov::genai::GenerationConfig& generation_config) {
+    const ov::genai::GenerationConfig& generation_config,
+    const std::shared_ptr<ov::Core>& core) {
+    m_ov_core = core ? core : std::make_shared<ov::Core>();
     auto start_time = std::chrono::steady_clock::now();
 
     auto properties_without_draft_model = properties;
     auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
     auto is_prompt_lookup_enabled = extract_prompt_lookup_from_config(properties_without_draft_model);
     auto eagle_rt_info = utils::eagle3::extract_eagle3_info_from_config(draft_model_desr.properties, std::filesystem::path(model_str));
-    auto model = utils::singleton_core().read_model(model_str, weights_tensor);
+    auto model = m_ov_core->read_model(model_str, weights_tensor);
 
     auto rt_info = model->get_rt_info();
     std::shared_ptr<InputsEmbedder> embedder = nullptr;
@@ -178,9 +184,9 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
         auto main_model_descr = ov::genai::ModelDesc(model, tokenizer, device, properties_without_draft_model, scheduler_config, generation_config);
         m_impl = std::make_shared<SpeculativeDecodingImpl>(main_model_descr, draft_model_desr);
     } else if (embedder) {
-        m_impl = std::make_shared<ContinuousBatchingImpl>(model, embedder, tokenizer, scheduler_config, device, properties_without_draft_model, generation_config);
+        m_impl = std::make_shared<ContinuousBatchingImpl>(model, embedder, tokenizer, scheduler_config, device, properties_without_draft_model, generation_config, m_ov_core);
     } else {
-        m_impl = std::make_shared<ContinuousBatchingImpl>(model, tokenizer, scheduler_config, device, properties_without_draft_model, generation_config);
+        m_impl = std::make_shared<ContinuousBatchingImpl>(model, tokenizer, scheduler_config, device, properties_without_draft_model, generation_config, m_ov_core);
     }
 
     m_impl->m_load_time_ms = get_load_time(start_time);
@@ -193,14 +199,16 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
         const std::string& device,
         std::optional<std::filesystem::path> embedder_config_dir_path,
         const ov::AnyMap& properties,
-        const ov::genai::GenerationConfig& generation_config) {
+        const ov::genai::GenerationConfig& generation_config,
+        const std::shared_ptr<ov::Core>& core) {
+    m_ov_core = core ? core : std::make_shared<ov::Core>();
     auto start_time = std::chrono::steady_clock::now();
 
     auto properties_without_draft_model = properties;
     auto draft_model_desr = utils::extract_draft_model_from_config(properties_without_draft_model);
     auto is_prompt_lookup_enabled = extract_prompt_lookup_from_config(properties_without_draft_model);
     auto model_pair = utils::get_model_weights_pair(models_map, "language");
-    auto model = utils::singleton_core().read_model(model_pair.first, model_pair.second);
+    auto model = m_ov_core->read_model(model_pair.first, model_pair.second);
 
     auto rt_info = model->get_rt_info();
     std::filesystem::path directory;
@@ -228,9 +236,9 @@ ContinuousBatchingPipeline::ContinuousBatchingPipeline(
         auto main_model_descr = ov::genai::ModelDesc(model, tokenizer, device, properties_without_draft_model, scheduler_config, generation_config);
         m_impl = std::make_shared<SpeculativeDecodingImpl>(main_model_descr, draft_model_desr);
     } else if (embedder) {
-        m_impl = std::make_shared<ContinuousBatchingImpl>(model, embedder, tokenizer, scheduler_config, device, properties_without_draft_model, generation_config);
+        m_impl = std::make_shared<ContinuousBatchingImpl>(model, embedder, tokenizer, scheduler_config, device, properties_without_draft_model, generation_config, m_ov_core);
     } else {
-        m_impl = std::make_shared<ContinuousBatchingImpl>(model, tokenizer, scheduler_config, device, properties_without_draft_model, generation_config);
+        m_impl = std::make_shared<ContinuousBatchingImpl>(model, tokenizer, scheduler_config, device, properties_without_draft_model, generation_config, m_ov_core);
     }
 
     m_impl->m_load_time_ms = get_load_time(start_time);

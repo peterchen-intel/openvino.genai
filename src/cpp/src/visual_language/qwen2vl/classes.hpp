@@ -16,8 +16,8 @@ namespace ov::genai {
 
 class VisionEncoderQwen2VL : public VisionEncoder {
 public:
-    explicit VisionEncoderQwen2VL(const std::filesystem::path& model_dir, const std::string& device, const ov::AnyMap properties);
-    explicit VisionEncoderQwen2VL(const ModelsMap& models_map, const std::filesystem::path& config_dir_path, const std::string& device, const ov::AnyMap properties);
+    explicit VisionEncoderQwen2VL(const std::filesystem::path& model_dir, const std::string& device, const std::shared_ptr<ov::Core>& core, const ov::AnyMap properties);
+    explicit VisionEncoderQwen2VL(const ModelsMap& models_map, const std::filesystem::path& config_dir_path, const std::string& device, const std::shared_ptr<ov::Core>& core, const ov::AnyMap properties);
 
     EncodedImage encode(const ov::Tensor& image, const ov::AnyMap& config_map) override;
     EncodedVideo encode_frames(const std::vector<ov::Tensor>& frames, const ov::AnyMap& config_map) override;
@@ -45,6 +45,7 @@ public:
         const VLMConfig& vlm_config,
         const std::filesystem::path& model_dir,
         const std::string& device,
+        const std::shared_ptr<ov::Core>& core,
         const ov::AnyMap device_config);
 
     InputsEmbedderQwen2VL(
@@ -53,6 +54,7 @@ public:
         const Tokenizer& tokenizer, 
         const std::filesystem::path& config_dir_path,
         const std::string& device,
+        const std::shared_ptr<ov::Core>& core,
         const ov::AnyMap device_config);
 
     ov::Tensor get_inputs_embeds(const std::string& prompt, const std::vector<ov::genai::EncodedImage>& images, ov::genai::VLMPerfMetrics& metrics, bool recalculate_merged_embeddings = true, const std::vector<size_t>& image_sequence = {}) override;

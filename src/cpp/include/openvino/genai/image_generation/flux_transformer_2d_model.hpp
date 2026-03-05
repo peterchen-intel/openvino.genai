@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <string>
+#include <memory>
 
 #include "openvino/core/any.hpp"
 #include "openvino/runtime/infer_request.hpp"
@@ -27,18 +28,21 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
-    explicit FluxTransformer2DModel(const std::filesystem::path& root_dir);
+    explicit FluxTransformer2DModel(const std::shared_ptr<ov::Core>& core, const std::filesystem::path& root_dir);
 
-    FluxTransformer2DModel(const std::filesystem::path& root_dir,
+    FluxTransformer2DModel(const std::shared_ptr<ov::Core>& core,
+                           const std::filesystem::path& root_dir,
                            const std::string& device,
                            const ov::AnyMap& properties = {});
 
-    FluxTransformer2DModel(const std::string& model,
+    FluxTransformer2DModel(const std::shared_ptr<ov::Core>& core,
+                           const std::string& model,
                            const Tensor& weights,
                            const Config& config,
                            const size_t vae_scale_factor);
 
-    FluxTransformer2DModel(const std::string& model,
+    FluxTransformer2DModel(const std::shared_ptr<ov::Core>& core,
+                           const std::string& model,
                            const Tensor& weights,
                            const Config& config,
                            const size_t vae_scale_factor,
@@ -47,18 +51,22 @@ public:
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
-    FluxTransformer2DModel(const std::filesystem::path& root_dir, const std::string& device, Properties&&... properties)
-        : FluxTransformer2DModel(root_dir, device, ov::AnyMap{std::forward<Properties>(properties)...}) {}
+    FluxTransformer2DModel(const std::shared_ptr<ov::Core>& core,
+                           const std::filesystem::path& root_dir,
+                           const std::string& device,
+                           Properties&&... properties)
+        : FluxTransformer2DModel(core, root_dir, device, ov::AnyMap{std::forward<Properties>(properties)...}) {}
 
     template <typename... Properties,
               typename std::enable_if<ov::util::StringAny<Properties...>::value, bool>::type = true>
-    FluxTransformer2DModel(const std::string& model,
+    FluxTransformer2DModel(const std::shared_ptr<ov::Core>& core,
+                           const std::string& model,
                            const Tensor& weights,
                            const Config& config,
                            const size_t vae_scale_factor,
                            const std::string& device,
                            Properties&&... properties)
-        : FluxTransformer2DModel(model, weights, config, vae_scale_factor, device, ov::AnyMap{std::forward<Properties>(properties)...}) {}
+        : FluxTransformer2DModel(core, model, weights, config, vae_scale_factor, device, ov::AnyMap{std::forward<Properties>(properties)...}) {}
 
     FluxTransformer2DModel(const FluxTransformer2DModel&);
 
@@ -84,6 +92,7 @@ public:
 
 private:
     Config m_config;
+    std::shared_ptr<ov::Core> m_core;
     AdapterController m_adapter_controller;
     ov::InferRequest m_request;
     std::shared_ptr<ov::Model> m_model;

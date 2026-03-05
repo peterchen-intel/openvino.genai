@@ -65,11 +65,12 @@
 
 namespace ov::genai::cdpruner {
 
-CDPruner::CDPruner(const Config& config)
+CDPruner::CDPruner(const Config& config, const std::shared_ptr<ov::Core>& core)
     : m_config(config),
       m_relevance_calc(config),
-      m_kernel_builder(config),
-      m_dpp_selector(config) {
+      m_kernel_builder(config, core),
+      m_dpp_selector(config),
+      m_core(core) {
     m_config.update_from_env();
     validate_config(config);
 }
@@ -372,7 +373,7 @@ bool CDPruner::update_config(const Config& new_config) {
             m_relevance_calc = RelevanceCalculator(m_config);
         }
         if (need_reinit_kernel) {
-            m_kernel_builder = ConditionalKernelBuilder(m_config);
+            m_kernel_builder = ConditionalKernelBuilder(m_config, m_core);
         }
         if (need_reinit_dpp) {
             m_dpp_selector = FastGreedyDPP(m_config);

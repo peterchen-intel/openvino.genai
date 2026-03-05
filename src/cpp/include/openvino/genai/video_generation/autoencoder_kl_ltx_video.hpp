@@ -34,19 +34,21 @@ public:
         explicit Config(const std::filesystem::path& config_path);
     };
 
-    explicit AutoencoderKLLTXVideo(const std::filesystem::path& vae_decoder_path);
+    explicit AutoencoderKLLTXVideo(const std::filesystem::path& vae_decoder_path, const std::shared_ptr<ov::Core>& core = nullptr);
 
     AutoencoderKLLTXVideo(const std::filesystem::path& vae_encoder_path,
-                  const std::filesystem::path& vae_decoder_path);
+                  const std::filesystem::path& vae_decoder_path, const std::shared_ptr<ov::Core>& core = nullptr);
 
     AutoencoderKLLTXVideo(const std::filesystem::path& vae_decoder_path,
                   const std::string& device,
-                  const ov::AnyMap& properties = {});
+                  const ov::AnyMap& properties = {},
+                  const std::shared_ptr<ov::Core>& core = nullptr);
 
     AutoencoderKLLTXVideo(const std::filesystem::path& vae_encoder_path,
                   const std::filesystem::path& vae_decoder_path,
                   const std::string& device,
-                  const ov::AnyMap& properties = {});
+                  const ov::AnyMap& properties = {},
+                  const std::shared_ptr<ov::Core>& core = nullptr);
 
     AutoencoderKLLTXVideo& compile(const std::string& device, const ov::AnyMap& properties = {});
 
@@ -64,6 +66,7 @@ private:
     Config m_config;
     ov::InferRequest m_encoder_request, m_decoder_request;
     std::shared_ptr<ov::Model> m_encoder_model = nullptr, m_decoder_model = nullptr;
+    std::shared_ptr<ov::Core> m_core;
 
     int64_t m_transformer_patch_size = -1, m_transformer_patch_size_t = -1;
 };

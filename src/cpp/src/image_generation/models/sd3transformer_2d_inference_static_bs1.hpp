@@ -34,7 +34,8 @@ public:
 
     virtual void compile(std::shared_ptr<ov::Model> model,
                          const std::string& device,
-                         const ov::AnyMap& properties) override {
+                         const ov::AnyMap& properties,
+                         const std::shared_ptr<ov::Core>& core) override {
         // All shapes for input/output tensors should be static.
         // Double check this and throw runtime error if it's not the case.
         for (auto& input : model->inputs()) {
@@ -56,9 +57,8 @@ public:
         // reshape to batch-1
         Inference::reshape(model, 1);
 
-        ov::Core core = utils::singleton_core();
-        ov::CompiledModel compiled_model = core.compile_model(model, device, properties);
-        ov::genai::utils::print_compiled_model_properties(compiled_model, "SD3 Transformer 2D batch-1 model");
+        ov::CompiledModel compiled_model = core->compile_model(model, device, properties);
+        ov::genai::utils::print_compiled_model_properties(compiled_model, "SD3 Transformer 2D batch-1 model", core);
 
         for (int i = 0; i < m_native_batch_size; i++) {
             m_requests[i] = compiled_model.create_infer_request();

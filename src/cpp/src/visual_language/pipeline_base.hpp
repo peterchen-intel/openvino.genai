@@ -13,6 +13,8 @@ class ov::genai::VLMPipeline::VLMPipelineBase {
     // Load pipeline time
     float m_load_time_ms = 0;
 
+    std::shared_ptr<ov::Core> m_ov_core = std::make_shared<ov::Core>();
+
     GenerationConfig resolve_generation_config(const ov::AnyMap& config_map) {
         ov::genai::OptionalGenerationConfig optional_config = utils::get_config_from_map(config_map);
         GenerationConfig config = optional_config.value_or(get_generation_config());
@@ -58,6 +60,9 @@ class ov::genai::VLMPipeline::VLMPipelineBase {
     }
 
 public:
+
+    VLMPipelineBase(const std::shared_ptr<ov::Core>& core = nullptr)
+        : m_ov_core(core ? core : std::make_shared<ov::Core>()) {}
 
     virtual ~VLMPipelineBase() = default;
 

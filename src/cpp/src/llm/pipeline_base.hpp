@@ -13,8 +13,9 @@ namespace genai {
 class LLMPipelineImplBase {
 public:
     LLMPipelineImplBase(const Tokenizer& tokenizer,
-                        const GenerationConfig& config)
-    : m_tokenizer(tokenizer), m_generation_config(config) { }
+                        const GenerationConfig& config,
+                        const std::shared_ptr<ov::Core>& core = nullptr)
+    : m_tokenizer(tokenizer), m_generation_config(config), m_ov_core(core ? core : std::make_shared<ov::Core>()) { }
 
     Tokenizer get_tokenizer() {
         return m_tokenizer;
@@ -71,6 +72,8 @@ protected:
     Tokenizer m_tokenizer;
     GenerationConfig m_generation_config;
     std::optional<AdapterController> m_adapter_controller;
+
+    std::shared_ptr<ov::Core> m_ov_core = std::make_shared<ov::Core>();
 
     float m_load_time_ms = 0.0f;
 };

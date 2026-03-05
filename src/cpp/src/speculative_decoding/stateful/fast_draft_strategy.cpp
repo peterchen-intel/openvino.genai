@@ -47,21 +47,22 @@ void update_perf_stat_by_infer_duration(ov::genai::RawPerfMetrics& raw_perf_coun
 namespace ov {
 namespace genai {
     LLMInferWrapper::LLMInferWrapper(
-    const ov::genai::ModelDesc& model_desc
+    const ov::genai::ModelDesc& model_desc,
+    const std::shared_ptr<ov::Core>& core
 ) : m_device(model_desc.device),
     m_properties(model_desc.properties),
     m_generation_config(model_desc.generation_config),
     m_tokenizer(model_desc.tokenizer) {
     m_kv_pos = ov::genai::utils::get_kv_axes_pos(model_desc.model);
     if (m_device == "NPU") {
-        auto [compiled, kv_desc] = utils::compile_decoder_for_npu(model_desc.model, m_properties, m_kv_pos);
+        auto [compiled, kv_desc] = utils::compile_decoder_for_npu(model_desc.model, m_properties, m_kv_pos, core);
         m_max_prompt_len = kv_desc.max_prompt_len;
         m_kvcache_total = kv_desc.max_prompt_len + kv_desc.min_response_len;
         m_request = compiled.create_infer_request();
     } else {
         // TODO: We might need it for manipulations with indices
         // utils::apply_gather_before_matmul_transformation(model_desc.model);
-        m_request = ov::genai::utils::singleton_core().compile_model(model_desc.model, m_device, m_properties).create_infer_request();
+        m_request = core->compile_model(model_desc.model, m_device, m_properties).create_infer_request();
     }
     raw_perf_metrics.m_inference_durations =  {{ ov::genai::MicroSeconds(0.0f) }};
 }
@@ -344,7 +345,8 @@ std::variant<int64_t, std::vector<int64_t>>
 }
 
 StatefulSpeculativeLLMPipeline::StatefulSpeculativeLLMPipeline(const ov::genai::ModelDesc& main_model_desc,
-                                                               const ov::genai::ModelDesc& draft_model_desc)
+                                                               const ov::genai::ModelDesc& draft_model_desc,
+                                                               const std::shared_ptr<ov::Core>& core)
     : StatefulSpeculativePipelineBase(main_model_desc.tokenizer, main_model_desc.generation_config) {
     OPENVINO_ASSERT(main_model_desc.model != nullptr, "Main model cannot be null");
     OPENVINO_ASSERT(draft_model_desc.model != nullptr, "Draft model cannot be null");
@@ -374,7 +376,7 @@ StatefulSpeculativeLLMPipeline::StatefulSpeculativeLLMPipeline(const ov::genai::
     if (draft_model_desc_copy.properties.empty() && (draft_model_desc_copy.device == main_model_desc.device)) {
         draft_model_desc_copy.properties = main_model_desc.properties;
     }
-    m_draft_request = std::make_unique<LLMInferWrapper>(draft_model_desc_copy);
+    m_draft_request = std::make_unique<LLMInferWrapper>(draft_model_desc_copy, core);
     OPENVINO_ASSERT(m_draft_request != nullptr, "Failed to create draft model inference wrapper");
 
     // Specifying number candidates to generate
@@ -389,7 +391,7 @@ StatefulSpeculativeLLMPipeline::StatefulSpeculativeLLMPipeline(const ov::genai::
     if (main_model_desc_copy.device == "NPU") {
         main_model_desc_copy.properties["NPUW_LLM_MAX_GENERATION_TOKEN_LEN"] = m_max_candidates_num + 1;
     }
-    m_main_request = std::make_unique<LLMInferWrapper>(main_model_desc_copy);
+    m_main_request = std::make_unique<LLMInferWrapper>(main_model_desc_copy, core);
     OPENVINO_ASSERT(m_main_request != nullptr, "Failed to create main model inference wrapper");
 }
 

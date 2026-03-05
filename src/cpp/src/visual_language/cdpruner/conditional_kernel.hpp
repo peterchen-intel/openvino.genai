@@ -27,7 +27,8 @@ class ConditionalKernelBuilder {
 public:
     /// @brief Constructor
     /// @param config Configuration for the kernel builder
-    explicit ConditionalKernelBuilder(const Config& config);
+    /// @param core Optional shared pointer to OpenVINO Core
+    explicit ConditionalKernelBuilder(const Config& config, const std::shared_ptr<ov::Core>& core = nullptr);
 
     /// @brief Build conditional kernel matrix L̃ = diag(r) · L · diag(r)
     /// @param visual_features Visual feature embeddings [B, N, D]

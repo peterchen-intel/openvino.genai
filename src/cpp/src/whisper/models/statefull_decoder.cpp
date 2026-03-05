@@ -24,11 +24,10 @@ WhisperStatefullDecoder::WhisperStatefullDecoder(const std::filesystem::path& mo
                                                  const std::string& device,
                                                  const ov::AnyMap& properties,
                                                  const ov::PartialShape& lhs_shape,
-                                                 const bool decompose_cross_attention_spda)
-    : m_decompose_cross_attention_spda_ops(decompose_cross_attention_spda) {
-    ov::Core core = utils::singleton_core();
-
-    auto model = core.read_model(models_path / "openvino_decoder_model.xml", {}, properties);
+                                                 const bool decompose_cross_attention_spda_ops,
+                                                 const std::shared_ptr<ov::Core>& core)
+    : m_decompose_cross_attention_spda_ops(decompose_cross_attention_spda_ops) {
+    auto model = core->read_model(models_path / "openvino_decoder_model.xml", {}, properties);
 
     if (m_decompose_cross_attention_spda_ops) {
         ov::genai::decompose_scaled_dot_product_attention_for_whisper(model);
@@ -48,7 +47,7 @@ WhisperStatefullDecoder::WhisperStatefullDecoder(const std::filesystem::path& mo
     } else {
         utils::apply_slice_before_matmul_transformation(model);
 
-        compiled_model = core.compile_model(model, device, properties);
+        compiled_model = core->compile_model(model, device, properties);
     }
 
     utils::print_compiled_model_properties(compiled_model, "whisper decoder model");
