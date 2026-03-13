@@ -8,6 +8,7 @@
 #include <numeric>
 
 #include "continuous_batching/timer.hpp"
+#include "logger.hpp"
 #include "openvino/genai/text_streamer.hpp"
 #include "speculative_decoding/eagle3_model_transforms.hpp"
 #include "utils.hpp"
@@ -348,18 +349,27 @@ InferenceOutput Eagle3TargetWrapper::infer(const ov::Tensor& input_ids,
 }
 
 InferResult Eagle3TargetWrapper::forward(const InferContext& ctx) {
+    GENAI_INFO("[EAGLE3_TRACE] Eagle3TargetWrapper::forward() called with input_token_count=%zu, sample_count=%zu, num_tokens_to_validate=%zu",
+               ctx.input_token_count, ctx.sample_count, ctx.num_tokens_to_validate);
+    
     // 1. Prepare inputs from sequence state
     ov::Tensor input_ids, attention_mask, position_ids;
     build_model_inputs(ctx.input_token_count, input_ids, attention_mask, position_ids);
 
     // 2. Infer
+    GENAI_INFO("[EAGLE3_TRACE] Eagle3TargetWrapper: Calling infer()");
     auto output = infer(input_ids, attention_mask, position_ids);
 
     // 3. Sample (use sample_count for number of positions to sample from)
+    GENAI_INFO("[EAGLE3_TRACE] Eagle3TargetWrapper: Sampling tokens (validation mode: %s)",
+               ctx.num_tokens_to_validate > 0 ? "true" : "false");
     auto sampled = sample_tokens(output.logits, ctx.input_token_count, ctx.sample_count, ctx.num_tokens_to_validate);
+    GENAI_INFO("[EAGLE3_TRACE] Eagle3TargetWrapper: Sampled %zu tokens", sampled.size());
 
     // 4. Store hidden states to sequence for draft model to use
     get_current_sequence()->update_hidden_state(output.hidden_features);
+    
+    GENAI_INFO("[EAGLE3_TRACE] Eagle3TargetWrapper::forward() completed");
 
     return InferResult{std::move(output), std::move(sampled)};
 }
@@ -414,6 +424,9 @@ InferenceOutput Eagle3DraftWrapper::infer(const ov::Tensor& input_ids,
 }
 
 InferResult Eagle3DraftWrapper::forward(const InferContext& ctx) {
+    GENAI_INFO("[EAGLE3_TRACE] Eagle3DraftWrapper::forward() called with input_token_count=%zu, use_target_hidden=%s",
+               ctx.input_token_count, ctx.use_target_hidden ? "true" : "false");
+    
     // 1. Prepare inputs
     ov::Tensor input_ids, attention_mask, position_ids;
     build_model_inputs(ctx.input_token_count, input_ids, attention_mask, position_ids);
@@ -424,20 +437,26 @@ InferResult Eagle3DraftWrapper::forward(const InferContext& ctx) {
         OPENVINO_ASSERT(ctx.target_sequence, "target_sequence required when use_target_hidden=true");
         hidden_states = ctx.target_sequence->get_hidden_state();
         OPENVINO_ASSERT(hidden_states && hidden_states.get_size() > 0, "Source sequence contains invalid hidden state");
+        GENAI_INFO("[EAGLE3_TRACE] Using target hidden states");
     } else {
         hidden_states = get_current_sequence()->get_hidden_state();
         OPENVINO_ASSERT(hidden_states && hidden_states.get_size() > 0, "Own sequence contains invalid hidden state");
+        GENAI_INFO("[EAGLE3_TRACE] Using internal hidden states");
     }
 
     // 3. Infer
+    GENAI_INFO("[EAGLE3_TRACE] Eagle3DraftWrapper: Calling infer()");
     auto output = infer(input_ids, attention_mask, position_ids, hidden_states);
 
     // 4. Sample
+    GENAI_INFO("[EAGLE3_TRACE] Eagle3DraftWrapper: Sampling tokens");
     auto sampled = sample_tokens(output.logits, ctx.input_token_count, 1);
 
     // 5. Store internal hidden state (last position) for next iteration
     auto next_hidden = utils::eagle3::slice_hidden_state_for_last_token(output.hidden_features);
     get_current_sequence()->update_hidden_state(next_hidden);
+    
+    GENAI_INFO("[EAGLE3_TRACE] Eagle3DraftWrapper::forward() completed, sampled token: %ld", sampled[0]);
 
     return InferResult{std::move(output), std::move(sampled)};
 }
@@ -445,15 +464,23 @@ InferResult Eagle3DraftWrapper::forward(const InferContext& ctx) {
 StatefulEagle3LLMPipeline::StatefulEagle3LLMPipeline(const ov::genai::ModelDesc& target_model_desc,
                                                      const ov::genai::ModelDesc& draft_model_desc)
     : StatefulSpeculativePipelineBase(target_model_desc.tokenizer, target_model_desc.generation_config) {
+    GENAI_INFO("[EAGLE3_TRACE] StatefulEagle3LLMPipeline constructor started");
+    GENAI_INFO("[EAGLE3_TRACE] Target device: %s, Draft device: %s", 
+               target_model_desc.device.c_str(), draft_model_desc.device.c_str());
+    
     // Initialize draft iterations from generation config
     ensure_num_assistant_tokens_is_set(m_generation_config);
     m_draft_iterations = m_generation_config.num_assistant_tokens;
+    
+    GENAI_INFO("[EAGLE3_TRACE] Draft iterations set to: %zu", m_draft_iterations);
 
     // Extract hidden_layers_list from draft model properties
     OPENVINO_ASSERT(draft_model_desc.properties.find("hidden_layers_list") != draft_model_desc.properties.end(),
                     "hidden_layers_list must be present in draft model properties");
 
     m_hidden_layers_to_abstract = draft_model_desc.properties.at("hidden_layers_list").as<std::vector<int32_t>>();
+
+    GENAI_INFO("[EAGLE3_TRACE] Hidden layers list extracted: size = %zu", m_hidden_layers_to_abstract.size());
 
     OPENVINO_ASSERT(m_hidden_layers_to_abstract.size() == 3,
                     "Eagle3 requires exactly three layers for feature extraction, got: " +
@@ -466,16 +493,26 @@ StatefulEagle3LLMPipeline::StatefulEagle3LLMPipeline(const ov::genai::ModelDesc&
     OPENVINO_ASSERT(draft_model, "Draft model must not be null");
 
     // Model preparation
+    GENAI_INFO("[EAGLE3_TRACE] Starting model transformations");
+    
     utils::eagle3::share_vocabulary(target_model, draft_model);
+    GENAI_INFO("[EAGLE3_TRACE] share_vocabulary() completed");
 
     auto d2t_mapping = utils::eagle3::extract_d2t_mapping_table(draft_model);
     OPENVINO_ASSERT(d2t_mapping && d2t_mapping->get_element_type() == ov::element::i64, "Invalid d2t mapping tensor");
+    GENAI_INFO("[EAGLE3_TRACE] extract_d2t_mapping_table() completed");
 
     utils::eagle3::transform_hidden_state(target_model, m_hidden_layers_to_abstract);
+    GENAI_INFO("[EAGLE3_TRACE] transform_hidden_state(target_model) completed");
+    
     utils::eagle3::move_fc_from_draft_to_main(draft_model, target_model);
+    GENAI_INFO("[EAGLE3_TRACE] move_fc_from_draft_to_main() completed");
+    
     utils::eagle3::transform_hidden_state(draft_model, {-1});
+    GENAI_INFO("[EAGLE3_TRACE] transform_hidden_state(draft_model) completed");
 
     const size_t validation_window = m_draft_iterations + 1;
+    GENAI_INFO("[EAGLE3_TRACE] Validation window size: %zu", validation_window);
 
     // Configure and create draft model
     auto draft_desc = draft_model_desc;
@@ -484,9 +521,11 @@ StatefulEagle3LLMPipeline::StatefulEagle3LLMPipeline(const ov::genai::ModelDesc&
         draft_desc.properties["NPUW_LLM_MAX_GENERATION_TOKEN_LEN"] = validation_window;
         draft_desc.properties["NPUW_ONLINE_PIPELINE"] = "NONE";
     }
+    GENAI_INFO("[EAGLE3_TRACE] Creating Eagle3DraftWrapper");
     m_draft = std::make_unique<Eagle3DraftWrapper>(draft_desc);
 
     m_draft->set_draft_target_mapping(d2t_mapping);
+    GENAI_INFO("[EAGLE3_TRACE] Eagle3DraftWrapper created and configured");
 
     // Configure and create target model
     auto target_desc = target_model_desc;
@@ -495,7 +534,10 @@ StatefulEagle3LLMPipeline::StatefulEagle3LLMPipeline(const ov::genai::ModelDesc&
         target_desc.properties["NPUW_LLM_MAX_GENERATION_TOKEN_LEN"] = validation_window;
         target_desc.properties["NPUW_SLICE_OUT"] = "NO";
     }
+    GENAI_INFO("[EAGLE3_TRACE] Creating Eagle3TargetWrapper");
     m_target = std::make_unique<Eagle3TargetWrapper>(target_desc);
+    GENAI_INFO("[EAGLE3_TRACE] Eagle3TargetWrapper created");
+    GENAI_INFO("[EAGLE3_TRACE] StatefulEagle3LLMPipeline constructor completed");
 }
 
 StatefulEagle3LLMPipeline::~StatefulEagle3LLMPipeline() {
@@ -518,6 +560,10 @@ GenerationConfig StatefulEagle3LLMPipeline::resolve_generation_config(OptionalGe
 EncodedResults StatefulEagle3LLMPipeline::generate_tokens(const EncodedInputs& inputs,
                                                           const GenerationConfig& config,
                                                           StreamerVariant streamer) {
+    GENAI_INFO("[EAGLE3_TRACE] generate_tokens() called");
+    GENAI_INFO("[EAGLE3_TRACE] max_new_tokens: %zu, eos_token_id: %zu", 
+               config.max_new_tokens, config.eos_token_id);
+    
     ManualTimer generate_timer("StatefulEagle3LLMPipeline::generate(EncodedInputs)");
     generate_timer.start();
 
@@ -535,12 +581,15 @@ EncodedResults StatefulEagle3LLMPipeline::generate_tokens(const EncodedInputs& i
 
     OPENVINO_ASSERT(input_ids.get_shape()[0] == 1, "Only batch size 1 supported");
     m_prompt_length = input_ids.get_shape()[1];
+    
+    GENAI_INFO("[EAGLE3_TRACE] Prompt length: %zu", m_prompt_length);
 
     // Initialize position IDs
     ov::Tensor position_ids{ov::element::i64, input_ids.get_shape()};
     utils::initialize_position_ids(position_ids, attention_mask);
 
     // Reset model states
+    GENAI_INFO("[EAGLE3_TRACE] Resetting model states");
     m_target->reset_state();
     m_draft->reset_state();
 
@@ -550,17 +599,21 @@ EncodedResults StatefulEagle3LLMPipeline::generate_tokens(const EncodedInputs& i
     sampling_config.max_new_tokens = config.max_new_tokens + m_draft_iterations + 1;
 
     // Initialize sequences with sampling config
+    GENAI_INFO("[EAGLE3_TRACE] Initializing sequences for target and draft models");
     m_target->initialize_sequence(input_ids, sampling_config);
     m_draft->initialize_sequence(input_ids, sampling_config);
 
     // Phase 1: Initial Prompt Processing (Prefill)
+    GENAI_INFO("[EAGLE3_TRACE] === Phase 1: Prefill - Processing prompt tokens ===");
 
     // Prefill: process all prompt tokens from sequence
     InferContext prefill_ctx;
     prefill_ctx.input_token_count = m_prompt_length;
+    GENAI_INFO("[EAGLE3_TRACE] Calling m_target->forward() for prefill with %zu tokens", m_prompt_length);
     auto prefill_result = m_target->forward(prefill_ctx);
     OPENVINO_ASSERT(prefill_result.sampled_tokens.size() == 1, "Expected single token from prefill");
     auto initial_token = prefill_result.sampled_tokens[0];
+    GENAI_INFO("[EAGLE3_TRACE] Prefill completed, initial token sampled: %ld", initial_token);
 
     // Append initial token to draft model
     m_draft->append_tokens({initial_token});
@@ -568,6 +621,7 @@ EncodedResults StatefulEagle3LLMPipeline::generate_tokens(const EncodedInputs& i
     auto streaming_status = stream_generated_tokens(streamer_ptr, {initial_token});
 
     // Phase 2: Speculative Decoding Loop
+    GENAI_INFO("[EAGLE3_TRACE] === Phase 2: Speculative Decoding Loop ===");
     size_t generated_tokens = 1;
     size_t total_draft_accepted = 0;
     size_t total_draft_generated = 0;
@@ -578,6 +632,7 @@ EncodedResults StatefulEagle3LLMPipeline::generate_tokens(const EncodedInputs& i
     while (!eos_reached && generated_tokens < config.max_new_tokens &&
            m_target->get_sequence_length() < m_prompt_length + config.max_new_tokens &&
            streaming_status == ov::genai::StreamingStatus::RUNNING) {
+        GENAI_INFO("[EAGLE3_TRACE] --- Iteration %zu: Calling run_speculative_iteration() ---", generated_tokens);
         auto result = run_speculative_iteration(input_token_count, static_cast<int64_t>(config.eos_token_id));
 
         streaming_status = stream_generated_tokens(streamer_ptr, result.validated_tokens);
@@ -587,12 +642,20 @@ EncodedResults StatefulEagle3LLMPipeline::generate_tokens(const EncodedInputs& i
         total_draft_accepted += result.accepted_tokens_count;
         eos_reached = result.eos_reached;
         generated_tokens++;
+        
+        GENAI_INFO("[EAGLE3_TRACE] Iteration %zu completed: accepted %zu tokens, next window size: %zu, EOS: %s", 
+                   generated_tokens - 1, result.accepted_tokens_count, result.next_window_size,
+                   eos_reached ? "true" : "false");
 
         // Prepare for next iteration (hidden states are stored in sequence)
         input_token_count = result.next_window_size;
     }
 
     // Phase 3: Finalization
+    GENAI_INFO("[EAGLE3_TRACE] === Phase 3: Finalization ===");
+    GENAI_INFO("[EAGLE3_TRACE] Total generated tokens: %zu, Total draft accepted: %zu, Total draft generated: %zu",
+               generated_tokens, total_draft_accepted, total_draft_generated);
+    
     m_streaming_was_cancelled = (streaming_status == ov::genai::StreamingStatus::CANCEL);
     if (streamer_ptr)
         streamer_ptr->end();
@@ -640,6 +703,8 @@ EncodedResults StatefulEagle3LLMPipeline::generate_tokens(const EncodedInputs& i
 StatefulEagle3LLMPipeline::SpeculativeResult StatefulEagle3LLMPipeline::run_speculative_iteration(
     size_t input_token_count,
     int64_t eos_token_id) {
+    GENAI_INFO("[EAGLE3_TRACE] run_speculative_iteration() started with input_token_count: %zu", input_token_count);
+    
     SpeculativeResult result;
 
     OPENVINO_ASSERT(m_target->get_running_sequence_count() == 1 && m_draft->get_running_sequence_count() == 1,
@@ -653,14 +718,17 @@ StatefulEagle3LLMPipeline::SpeculativeResult StatefulEagle3LLMPipeline::run_spec
     const size_t pre_draft_token_len = m_draft->get_sequence_length();
 
     // Step 1: Generate first draft token using target hidden states
+    GENAI_INFO("[EAGLE3_TRACE] Step 1: Generating first draft token using target hidden states");
     InferContext first_ctx;
     first_ctx.input_token_count = input_token_count;
     first_ctx.use_target_hidden = true;
     first_ctx.target_sequence = m_target->get_current_sequence();
+    GENAI_INFO("[EAGLE3_TRACE] Calling m_draft->forward() for first token");
     auto first_result = m_draft->forward(first_ctx);
 
     OPENVINO_ASSERT(first_result.sampled_tokens.size() == 1, "Expected single token from first draft");
     int64_t first_draft_token = first_result.sampled_tokens[0];
+    GENAI_INFO("[EAGLE3_TRACE] First draft token sampled: %ld", first_draft_token);
 
     // Collect draft candidates
     std::vector<int64_t> draft_candidates;
@@ -671,15 +739,19 @@ StatefulEagle3LLMPipeline::SpeculativeResult StatefulEagle3LLMPipeline::run_spec
     m_target->append_tokens({first_draft_token});
 
     // Step 2: Generate additional draft tokens using internal hidden states
+    GENAI_INFO("[EAGLE3_TRACE] Step 2: Generating %zu additional draft tokens using internal hidden states",
+               m_draft_iterations - 1);
     for (size_t i = 1; i < m_draft_iterations; ++i) {
         InferContext more_ctx;
         more_ctx.input_token_count = 1;
         more_ctx.use_target_hidden = false;
+        GENAI_INFO("[EAGLE3_TRACE] Draft iteration %zu: Calling m_draft->forward()", i);
         auto more_result = m_draft->forward(more_ctx);
 
         OPENVINO_ASSERT(more_result.sampled_tokens.size() == 1, "Expected single token from draft iteration");
         int64_t draft_token = more_result.sampled_tokens[0];
         draft_candidates.push_back(draft_token);
+        GENAI_INFO("[EAGLE3_TRACE] Draft iteration %zu: token sampled: %ld", i, draft_token);
 
         // Append draft token to target sequence for validation phase
         // During validation, target model will retrieve tokens from its own sequence
@@ -688,6 +760,7 @@ StatefulEagle3LLMPipeline::SpeculativeResult StatefulEagle3LLMPipeline::run_spec
     }
 
     // Step 3: Validate draft tokens with target model
+    GENAI_INFO("[EAGLE3_TRACE] Step 3: Validating %zu draft tokens with target model", m_draft_iterations);
 
     const size_t validation_window_size = m_draft_iterations + 1;
 
@@ -695,18 +768,24 @@ StatefulEagle3LLMPipeline::SpeculativeResult StatefulEagle3LLMPipeline::run_spec
     val_ctx.input_token_count = validation_window_size;
     val_ctx.sample_count = validation_window_size;
     val_ctx.num_tokens_to_validate = m_draft_iterations;
+    GENAI_INFO("[EAGLE3_TRACE] Calling m_target->forward() for validation with window size: %zu", validation_window_size);
     auto val_result = m_target->forward(val_ctx);
 
     // Sampler validates draft tokens and returns accepted + new sampled token
     auto validated_tokens = val_result.sampled_tokens;
+    GENAI_INFO("[EAGLE3_TRACE] Validation completed, received %zu validated tokens", validated_tokens.size());
 
     // Result: [accepted_draft_tokens..., new_sampled_token]
     const size_t accepted_count = validated_tokens.size() - 1;
     const int64_t target_predicted_token = validated_tokens.back();
     const size_t tokens_to_remove = m_draft_iterations - accepted_count;
     const size_t total_accepted_tokens = validated_tokens.size();
+    
+    GENAI_INFO("[EAGLE3_TRACE] Accepted %zu draft tokens out of %zu, new target token: %ld",
+               accepted_count, m_draft_iterations, target_predicted_token);
 
     // Step 4: Synchronize sequences and KV cache
+    GENAI_INFO("[EAGLE3_TRACE] Step 4: Synchronizing sequences and KV cache");
     // Target model's sequence is already updated by Sampler
     // Sync draft model's sequence
     m_draft->truncate_sequence(pre_draft_token_len);
@@ -714,11 +793,13 @@ StatefulEagle3LLMPipeline::SpeculativeResult StatefulEagle3LLMPipeline::run_spec
 
     // Trim KV cache for rejected tokens
     if (tokens_to_remove > 0) {
+        GENAI_INFO("[EAGLE3_TRACE] Trimming KV cache for %zu rejected tokens", tokens_to_remove);
         m_target->trim_kv_cache(tokens_to_remove);
         m_draft->trim_kv_cache(tokens_to_remove);
     }
 
     // Step 5: Update hidden states for next iteration
+    GENAI_INFO("[EAGLE3_TRACE] Step 5: Updating hidden states for next iteration");
     // Note: forward() already stored hidden_features to sequence, but we need to slice it
     auto current_hidden = val_result.output.hidden_features;
     OPENVINO_ASSERT(current_hidden && current_hidden.get_size() > 0, "Missing hidden features");
@@ -736,6 +817,9 @@ StatefulEagle3LLMPipeline::SpeculativeResult StatefulEagle3LLMPipeline::run_spec
     result.next_window_size = accepted_count + 1;
     result.validated_tokens = std::move(validated_tokens);
     result.eos_reached = (target_predicted_token == eos_token_id);
+    
+    GENAI_INFO("[EAGLE3_TRACE] run_speculative_iteration() completed: accepted=%zu, next_window=%zu, EOS=%s",
+               result.accepted_tokens_count, result.next_window_size, result.eos_reached ? "true" : "false");
 
     return result;
 }
