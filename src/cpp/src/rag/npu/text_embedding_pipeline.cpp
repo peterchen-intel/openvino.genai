@@ -10,7 +10,8 @@
 namespace ov {
 namespace genai {
 
-InferRequest create_text_embedding_npu_request(std::shared_ptr<ov::Model>& model,
+InferRequest create_text_embedding_npu_request(ov::Core& core,
+                                               std::shared_ptr<ov::Model>& model,
                                                const TextEmbeddingPipeline::Config& config,
                                                const ov::AnyMap& properties,
                                                std::optional<size_t> max_position_embeddings,
@@ -33,7 +34,6 @@ InferRequest create_text_embedding_npu_request(std::shared_ptr<ov::Model>& model
         std::tie(compiled_model, kv_desc) =
             utils::compile_decoder_for_npu_text_embedding(model, properties, kv_pos, config);
     } else {
-        ov::Core core = utils::singleton_core();
         model = utils::apply_postprocessing(model, config);
         compiled_model = core.compile_model(model, "NPU", properties);
     }
@@ -41,10 +41,10 @@ InferRequest create_text_embedding_npu_request(std::shared_ptr<ov::Model>& model
     return compiled_model.create_infer_request();
 }
 
-InferRequest create_text_embedding_npu_post_request(std::shared_ptr<ov::Model>& model,
+InferRequest create_text_embedding_npu_post_request(ov::Core& core,
+                                                    std::shared_ptr<ov::Model>& model,
                                                     const TextEmbeddingPipeline::Config& config) {
     if (model->is_dynamic()) {
-        ov::Core core = utils::singleton_core();
         auto post_model = utils::create_post_model(model, config);
         auto post_compiled_model = core.compile_model(post_model, "CPU");
         return post_compiled_model.create_infer_request();

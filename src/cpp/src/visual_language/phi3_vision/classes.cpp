@@ -439,7 +439,7 @@ ov::CompiledModel create_hd_feature_transformer() {
     auto t68 = make_shared<Concat>(NodeVector{t45, t61, t67, t37}, 0);
     auto t69 = make_shared<Reshape>(t54, t68, false);
     shared_ptr<Model> model = make_shared<Model>(make_shared<Result>(t69), ParameterVector{t0, t1, t2});
-    return utils::singleton_core().compile_model(
+    return ov::Core{}.compile_model(
         model, "CPU"
     );
 }
@@ -932,9 +932,9 @@ VisionEncoderPhi3V::VisionEncoderPhi3V(const std::filesystem::path& model_dir,
     : VisionEncoder(model_dir, device, properties),
       use_ov_vision_preprocess(can_use_ov_vision_preprocess()) {
     if (use_ov_vision_preprocess) {
-        auto vision_encoder_model = utils::singleton_core().read_model(model_dir / "openvino_vision_embeddings_model.xml");
+        auto vision_encoder_model = ov::Core{}.read_model(model_dir / "openvino_vision_embeddings_model.xml");
         auto model = patch_image_preprocess_into_vision_encoder_model(vision_encoder_model, m_processor_config);
-        auto compiled_model = utils::singleton_core().compile_model(model, device, properties);
+        auto compiled_model = ov::Core{}.compile_model(model, device, properties);
         m_ireq_queue_vision_encoder = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
             compiled_model.get_property(ov::optimal_number_of_infer_requests),
             [&compiled_model]() -> ov::InferRequest {
@@ -949,7 +949,7 @@ VisionEncoderPhi3V::VisionEncoderPhi3V(const std::filesystem::path& model_dir,
             return compiled_model.create_infer_request();
         });
 
-    compiled_model = utils::singleton_core().compile_model(model_dir / "openvino_vision_projection_model.xml", device, {});
+    compiled_model = ov::Core{}.compile_model(model_dir / "openvino_vision_projection_model.xml", device, {});
     m_ireq_queue_vision_projection = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
         compiled_model.get_property(ov::optimal_number_of_infer_requests),
         [&compiled_model]() -> ov::InferRequest {
@@ -966,9 +966,9 @@ VisionEncoderPhi3V::VisionEncoderPhi3V(const ModelsMap& models_map,
       use_ov_vision_preprocess(can_use_ov_vision_preprocess()) {
     if (use_ov_vision_preprocess) {
         const auto& [vision_encoder_model, vision_encoder_weights] = utils::get_model_weights_pair(models_map, "vision_embeddings");
-        auto model_org = utils::singleton_core().read_model(vision_encoder_model, vision_encoder_weights);
+        auto model_org = ov::Core{}.read_model(vision_encoder_model, vision_encoder_weights);
         auto model = patch_image_preprocess_into_vision_encoder_model(model_org, m_processor_config);
-        auto compiled_model = utils::singleton_core().compile_model(model, device, properties);
+        auto compiled_model = ov::Core{}.compile_model(model, device, properties);
 
         m_ireq_queue_vision_encoder = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
             compiled_model.get_property(ov::optimal_number_of_infer_requests),
@@ -986,7 +986,7 @@ VisionEncoderPhi3V::VisionEncoderPhi3V(const ModelsMap& models_map,
 
     const auto& vision_encoder_model = utils::get_model_weights_pair(models_map, "vision_projection").first;
     const auto& vision_encoder_weights = utils::get_model_weights_pair(models_map, "vision_projection").second;
-    compiled_model = utils::singleton_core().compile_model(vision_encoder_model, vision_encoder_weights, device, properties);
+    compiled_model = ov::Core{}.compile_model(vision_encoder_model, vision_encoder_weights, device, properties);
     m_ireq_queue_vision_projection = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
         compiled_model.get_property(ov::optimal_number_of_infer_requests),
         [&compiled_model]() -> ov::InferRequest {

@@ -10,6 +10,7 @@
 #include "logger.hpp"
 #include "npu/text_embedding_pipeline.hpp"
 #include "openvino/core/except.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/genai/tokenizer.hpp"
 #include "text_embedding_utils.hpp"
 #include "utils.hpp"
@@ -90,9 +91,7 @@ public:
           m_max_position_embeddings{read_max_position_embeddings(models_path)} {
         m_config.validate();
 
-        ov::Core core = utils::singleton_core();
-
-        auto model = core.read_model(models_path / "openvino_model.xml", {}, properties);
+        auto model = m_ov_core.read_model(models_path / "openvino_model.xml", {}, properties);
 
         bool is_seq_len_fixed = true;
         if (m_config.max_length) {
@@ -113,18 +112,19 @@ public:
         }
 
         if (device == "NPU") {
-            m_request = create_text_embedding_npu_request(model,
+            m_request = create_text_embedding_npu_request(m_ov_core,
+                                                          model,
                                                           m_config,
                                                           properties,
                                                           m_max_position_embeddings,
                                                           is_seq_len_fixed);
-            m_post_request = create_text_embedding_npu_post_request(model, m_config);
+            m_post_request = create_text_embedding_npu_post_request(m_ov_core, model, m_config);
         } else {
             if (m_config.batch_size.has_value() || m_config.max_length.has_value()) {
                 utils::reshape_model(model, m_config, m_max_position_embeddings);
             }
             model = utils::apply_postprocessing(model, m_config);
-            auto compiled_model = core.compile_model(model, device, properties);
+            auto compiled_model = m_ov_core.compile_model(model, device, properties);
             utils::print_compiled_model_properties(compiled_model, "text embedding model");
             m_request = compiled_model.create_infer_request();
         }
@@ -167,6 +167,7 @@ public:
     };
 
 private:
+    ov::Core m_ov_core;
     Tokenizer m_tokenizer;
     InferRequest m_request;
     InferRequest m_post_request;

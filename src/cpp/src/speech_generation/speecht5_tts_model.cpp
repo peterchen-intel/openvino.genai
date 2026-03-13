@@ -19,12 +19,11 @@
 namespace {
 
 ov::InferRequest init_model(const std::filesystem::path& models_path,
+                            ov::Core& core,
                             const std::string& model_file_name,
                             const std::string& model_name,
                             const std::string& device,
                             const ov::AnyMap& properties) {
-    ov::Core core = ov::genai::utils::singleton_core();
-
     auto compiled = core.compile_model(models_path / model_file_name, device, properties);
     ov::genai::utils::print_compiled_model_properties(compiled, model_name.c_str());
     ov::InferRequest request = compiled.create_infer_request();
@@ -101,11 +100,11 @@ SpeechT5TTSImpl::SpeechT5TTSImpl(const std::filesystem::path& models_path,
       m_num_mel_bins(80) {
     init_model_config_params(models_path);
 
-    m_encoder = init_model(models_path, "openvino_encoder_model.xml", "speecht5_tts encoder model", device, properties);
-    m_postnet = init_model(models_path, "openvino_postnet.xml", "speecht5_tts postnet model", device, properties);
-    m_vocoder = init_model(models_path, "openvino_vocoder.xml", "speecht5_tts vocoder model", device, properties);
+    m_encoder = init_model(models_path, m_ov_core, "openvino_encoder_model.xml", "speecht5_tts encoder model", device, properties);
+    m_postnet = init_model(models_path, m_ov_core, "openvino_postnet.xml", "speecht5_tts postnet model", device, properties);
+    m_vocoder = init_model(models_path, m_ov_core, "openvino_vocoder.xml", "speecht5_tts vocoder model", device, properties);
 
-    m_decoder = std::make_shared<SpeechT5TTSDecoder>(models_path, device, properties);
+    m_decoder = std::make_shared<SpeechT5TTSDecoder>(models_path, m_ov_core, device, properties);
 }
 
 void SpeechT5TTSImpl::init_model_config_params(const std::filesystem::path& root_dir) {

@@ -49,14 +49,30 @@ LTXVideoTransformer3DModel::Config::Config(const std::filesystem::path& config_p
 
 LTXVideoTransformer3DModel::LTXVideoTransformer3DModel(const std::filesystem::path& root_dir)
     : m_config(root_dir / "config.json") {
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+    m_model = m_core.read_model(root_dir / "openvino_model.xml");
+    std::tie(m_spatial_compression_ratio, m_temporal_compression_ratio) = get_compression_ratio(root_dir.parent_path() / "vae_decoder" / "config.json");
+}
+
+LTXVideoTransformer3DModel::LTXVideoTransformer3DModel(ov::Core& core,
+                                                       const std::filesystem::path& root_dir)
+    : m_core(core),
+      m_config(root_dir / "config.json") {
+    m_model = m_core.read_model(root_dir / "openvino_model.xml");
     std::tie(m_spatial_compression_ratio, m_temporal_compression_ratio) = get_compression_ratio(root_dir.parent_path() / "vae_decoder" / "config.json");
 }
 
 LTXVideoTransformer3DModel::LTXVideoTransformer3DModel(const std::filesystem::path& root_dir,
-                                             const std::string& device,
-                                             const ov::AnyMap& properties)
+                                              const std::string& device,
+                                              const ov::AnyMap& properties)
     : LTXVideoTransformer3DModel(root_dir) {
+    compile(device, properties);
+}
+
+LTXVideoTransformer3DModel::LTXVideoTransformer3DModel(ov::Core& core,
+                                                       const std::filesystem::path& root_dir,
+                                                       const std::string& device,
+                                                       const ov::AnyMap& properties)
+    : LTXVideoTransformer3DModel(core, root_dir) {
     compile(device, properties);
 }
 
@@ -71,7 +87,7 @@ LTXVideoTransformer3DModel& LTXVideoTransformer3DModel::compile(const std::strin
     std::optional<AdapterConfig> adapters;
     auto filtered_properties = extract_adapters_from_properties(properties, &adapters);
     OPENVINO_ASSERT(!adapters, "Adapters are not currently supported for Video Generation Pipeline.");
-    ov::CompiledModel compiled_model = utils::singleton_core().compile_model(m_model, device, *filtered_properties);
+    ov::CompiledModel compiled_model = m_core.compile_model(m_model, device, *filtered_properties);
     ov::genai::utils::print_compiled_model_properties(compiled_model, "LTX Video Transformer 3D model");
     m_request = compiled_model.create_infer_request();
     const auto& input_shape = compiled_model.input(0).get_partial_shape();

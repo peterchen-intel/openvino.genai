@@ -79,15 +79,14 @@ public:
         m_generation_config.update_generation_config(properties_copy);
         erase_whisper_generation_config_keys(properties_copy);
 
-        ov::Core core = utils::singleton_core();
         ov::CompiledModel compiled_model;
         if (device == "NPU") {
-            auto encoder_model = core.read_model(models_path / "openvino_encoder_model.xml", {}, properties_copy);
+            auto encoder_model = m_ov_core.read_model(models_path / "openvino_encoder_model.xml", {}, properties_copy);
             // NB: only batch_size == 1 is supported now for NPU
             reshape_to_static_encoder(encoder_model, 1, m_feature_extractor.feature_size);
-            compiled_model = core.compile_model(encoder_model, "NPU", properties_copy);
+            compiled_model = m_ov_core.compile_model(encoder_model, "NPU", properties_copy);
         } else {
-            compiled_model = core.compile_model(models_path / "openvino_encoder_model.xml", device, properties_copy);
+            compiled_model = m_ov_core.compile_model(models_path / "openvino_encoder_model.xml", device, properties_copy);
         }
 
         ov::genai::utils::print_compiled_model_properties(compiled_model, "whisper encoder model");
@@ -96,6 +95,7 @@ public:
         const bool decompose_cross_attention_spda_ops = m_generation_config.word_timestamps;
         m_decoder =
             WhisperDecoder::from_path(models_path,
+                                      m_ov_core,
                                       device,
                                       properties_copy,
                                       m_encoder.get_compiled_model().output("last_hidden_state").get_partial_shape(),

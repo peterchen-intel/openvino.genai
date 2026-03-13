@@ -11,6 +11,7 @@ namespace ov::genai {
 class WhisperStatefullDecoder : public WhisperDecoder {
 public:
     WhisperStatefullDecoder(const std::filesystem::path& models_path,
+                            ov::Core& core,
                             const std::string& device,
                             const ov::AnyMap& properties,
                             const ov::PartialShape& lhs_shape,

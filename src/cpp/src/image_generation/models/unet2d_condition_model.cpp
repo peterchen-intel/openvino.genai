@@ -30,7 +30,7 @@ UNet2DConditionModel::Config::Config(const std::filesystem::path& config_path) {
 
 UNet2DConditionModel::UNet2DConditionModel(const std::filesystem::path& root_dir) :
     m_config(root_dir / "config.json") {
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+    m_model = ov::Core{}.read_model(root_dir / "openvino_model.xml");
     m_vae_scale_factor = get_vae_scale_factor(root_dir.parent_path() / "vae_decoder" / "config.json");
 }
 
@@ -47,7 +47,7 @@ UNet2DConditionModel::UNet2DConditionModel(const std::filesystem::path& root_dir
         return;
     }
 
-    m_model = utils::singleton_core().read_model(root_dir / "openvino_model.xml");
+    m_model = ov::Core{}.read_model(root_dir / "openvino_model.xml");
     compile(device, properties_without_blob);
 }
 
@@ -56,7 +56,7 @@ UNet2DConditionModel::UNet2DConditionModel(const std::string& model,
                                            const Config& config,
                                            const size_t vae_scale_factor) :
     m_config(config), m_vae_scale_factor(vae_scale_factor) {
-    m_model = utils::singleton_core().read_model(model, weights);
+    m_model = ov::Core{}.read_model(model, weights);
 }
 
 UNet2DConditionModel::UNet2DConditionModel(const std::string& model,

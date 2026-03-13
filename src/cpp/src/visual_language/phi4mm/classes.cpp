@@ -208,7 +208,7 @@ std::unique_ptr<ov::genai::CircularBufferQueue<ov::InferRequest>> create_image_p
     ParameterVector parameters{t0, t1, t2, t3, t4};
     auto model = make_shared<Model>(std::move(results), std::move(sinks), std::move(parameters));
     using namespace ov::genai;
-    CompiledModel compiled = utils::singleton_core().compile_model(model, device);
+    CompiledModel compiled = ov::Core{}.compile_model(model, device);
     return make_unique<CircularBufferQueue<InferRequest>>(
         compiled.get_property(ov::optimal_number_of_infer_requests),
         [&compiled]() -> ov::InferRequest {
@@ -499,7 +499,7 @@ std::unique_ptr<ov::genai::CircularBufferQueue<ov::InferRequest>> create_separat
     ParameterVector parameters{std::move(t0), std::move(t1), std::move(t2), std::move(t3), std::move(t4), std::move(t5)};
     auto model = make_shared<Model>(std::move(results), std::move(sinks), std::move(parameters));
     using namespace ov::genai;
-    CompiledModel compiled = utils::singleton_core().compile_model(model, device);
+    CompiledModel compiled = ov::Core{}.compile_model(model, device);
     return make_unique<CircularBufferQueue<InferRequest>>(
         compiled.get_property(ov::optimal_number_of_infer_requests),
         [&compiled]() -> ov::InferRequest {
@@ -636,7 +636,7 @@ VisionEncoderPhi4MM::VisionEncoderPhi4MM(
 VisionEncoder(model_dir, device, properties),
 m_image_preprocessors{create_image_preprocessors(device)},
 m_separator_inserters{create_separator_inserters(device)} {
-    auto compiled_model = utils::singleton_core().compile_model(model_dir / "openvino_vision_projection_model.xml", device, {});
+    auto compiled_model = ov::Core{}.compile_model(model_dir / "openvino_vision_projection_model.xml", device, {});
     m_ireq_queue_vision_projection = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
         compiled_model.get_property(ov::optimal_number_of_infer_requests),
         [&compiled_model]() -> ov::InferRequest {
@@ -656,7 +656,7 @@ m_image_preprocessors{create_image_preprocessors(device)},
 m_separator_inserters{create_separator_inserters(device)} {
     const auto& vision_projection_model = utils::get_model_weights_pair(models_map, "vision_projection").first;
     const auto& vision_projection_weights = utils::get_model_weights_pair(models_map, "vision_projection").second;
-    auto compiled_model = utils::singleton_core().compile_model(vision_projection_model, vision_projection_weights, device, properties);
+    auto compiled_model = ov::Core{}.compile_model(vision_projection_model, vision_projection_weights, device, properties);
     m_ireq_queue_vision_projection = std::make_unique<CircularBufferQueue<ov::InferRequest>>(
         compiled_model.get_property(ov::optimal_number_of_infer_requests),
         [&compiled_model]() -> ov::InferRequest {

@@ -13,6 +13,7 @@ namespace ov::genai {
 class WhisperDecoder {
 public:
     static std::shared_ptr<WhisperDecoder> from_path(const std::filesystem::path& models_path,
+                                                     ov::Core& core,
                                                      const std::string& device,
                                                      const ov::AnyMap& properties,
                                                      const ov::PartialShape& lhs_shape,

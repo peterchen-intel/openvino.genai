@@ -6,6 +6,7 @@
 #include "openvino/genai/llm_pipeline.hpp"
 #include "openvino/genai/tokenizer.hpp"
 #include "openvino/genai/streamer_base.hpp"
+#include "openvino/runtime/core.hpp"
 
 namespace ov {
 namespace genai {
@@ -68,6 +69,7 @@ public:
     }
 
 protected:
+    ov::Core m_ov_core;
     Tokenizer m_tokenizer;
     GenerationConfig m_generation_config;
     std::optional<AdapterController> m_adapter_controller;

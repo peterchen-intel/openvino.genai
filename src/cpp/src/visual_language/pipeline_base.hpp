@@ -4,6 +4,7 @@
 #pragma once
 
 #include "openvino/genai/visual_language/pipeline.hpp"
+#include "openvino/runtime/core.hpp"
 #include "utils.hpp"
 
 using namespace ov::genai;
@@ -12,7 +13,10 @@ namespace ov::genai {
 class ov::genai::VLMPipeline::VLMPipelineBase {
     // Load pipeline time
     float m_load_time_ms = 0;
+protected:
+    ov::Core m_ov_core;
 
+private:
     GenerationConfig resolve_generation_config(const ov::AnyMap& config_map) {
         ov::genai::OptionalGenerationConfig optional_config = utils::get_config_from_map(config_map);
         GenerationConfig config = optional_config.value_or(get_generation_config());

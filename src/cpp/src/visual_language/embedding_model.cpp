@@ -44,7 +44,7 @@ EmbeddingsModel::EmbeddingsModel(const std::filesystem::path& model_dir,
                                  const float scale_emb,
                                  const std::string& device,
                                  const ov::AnyMap& properties) {
-    ov::Core core = utils::singleton_core();
+    ov::Core core = ov::Core{};
     std::shared_ptr<ov::Model> m_model = core.read_model(model_dir / "openvino_text_embeddings_model.xml", {}, properties);
     // apply embedding postprocessing step by merging them into the model
     merge_postprocess(m_model, scale_emb);
@@ -59,7 +59,7 @@ EmbeddingsModel::EmbeddingsModel(const std::string& model,
                                  const float scale_emb,
                                  const std::string& device,
                                  const ov::AnyMap& properties) {
-    ov::Core core = utils::singleton_core();
+    ov::Core core = ov::Core{};
     std::shared_ptr<ov::Model> m_model = core.read_model(model, weights);
     // apply embedding postprocessing step by merging them into the model
     merge_postprocess(m_model, scale_emb);

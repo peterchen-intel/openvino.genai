@@ -6,6 +6,7 @@
 #include "openvino/genai/speech_generation/speech_generation_config.hpp"
 #include "openvino/genai/speech_generation/speech_generation_perf_metrics.hpp"
 #include "openvino/genai/speech_generation/text2speech_pipeline.hpp"
+#include "openvino/runtime/core.hpp"
 
 namespace ov {
 namespace genai {
@@ -32,6 +33,7 @@ public:
 protected:
     void save_load_time(std::chrono::steady_clock::time_point start_time);
 
+    ov::Core m_ov_core;
     GenerationConfig m_generation_config;
     float m_load_time_ms = 0.0f;
     SpeechGenerationPerfMetrics m_perf_metrics;

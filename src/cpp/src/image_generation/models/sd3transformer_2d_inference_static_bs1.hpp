@@ -56,7 +56,7 @@ public:
         // reshape to batch-1
         Inference::reshape(model, 1);
 
-        ov::Core core = utils::singleton_core();
+        ov::Core core = ov::Core{};
         ov::CompiledModel compiled_model = core.compile_model(model, device, properties);
         ov::genai::utils::print_compiled_model_properties(compiled_model, "SD3 Transformer 2D batch-1 model");
 
