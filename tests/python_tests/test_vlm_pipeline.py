@@ -537,7 +537,7 @@ def synthetic_video(pytestconfig):
     car_url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg"
     image = from_cache_or_download(pytestconfig, car_url, "car.jpg")
 
-    # make 12 frames to fit videochat_flash's hard requirement of frame number divisible by 4
+    # make 12 frames to fit VideoChat-Flash's hard requirement of frame number divisible by 4
     total_frames = 12
     frames = []
     frames.append(np.array(image))
@@ -2508,7 +2508,7 @@ def test_vlm_prompt_lookup_functionality(cat_tensor):
 @pytest.fixture(scope="module", params=ATTENTION_BACKEND, ids=lambda b: f"VideoChat-Flash/{b}")
 def ov_videochatflash_pipe_raw(request: pytest.FixtureRequest) -> VLMPipeline:
     """
-    Raw VideoChat-Flash pipeline without _VlmPipelineImageAdapter.
+    Raw VideoChat-Flash pipeline without _VlmPipelineVideoChatFlashImageGuard.
     Used for input-contract tests that must not auto-pad frames.
     """
     ov_backend = request.param

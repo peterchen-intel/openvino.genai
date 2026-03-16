@@ -87,7 +87,7 @@ ov::Tensor preprocess(const ov::Tensor& input_nhwc_u8,
 
         // 2) rescale(/255) + 3) normalize((x-mean)/std)
         // clip_image_preprocess implements normalization pipeline and returns f32 planar image.
-        clip_image_f32 clip_norm = clip_image_preprocess(ctx, clip_resized); //// CHW
+        clip_image_f32 clip_norm = clip_image_preprocess(ctx, clip_resized); // CHW
 
         // Convert planar(CHW) -> NCHW
         OPENVINO_ASSERT(clip_norm.buf.size() == out_frame_elems, "Unexpected preprocessed frame size.");
@@ -319,7 +319,7 @@ ov::Tensor remove_second_dim_first_element(const ov::Tensor& input) {
     ov::Tensor output(element_type, output_shape);
     auto output_data = output.data<float>();
 
-    for(size_t i=0; i < input_shape[0]; i++) {
+    for (size_t i = 0; i < input_shape[0]; i++) {
         std::copy(
             input_data + i * org_seq_len * head_elements + head_elements,
             input_data + (i + 1) * org_seq_len * head_elements,
