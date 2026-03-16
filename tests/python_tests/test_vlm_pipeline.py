@@ -31,7 +31,7 @@ import collections
 from enum import Enum
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Generator
+from typing import Callable, Generator, Any
 import openvino_tokenizers
 import openvino
 import PIL
@@ -96,11 +96,31 @@ PROMPTS: list[str] = [
 ]
 
 
+def _is_videochat_flash_model(model_id: str) -> bool:
+    return "videochat-flash" in model_id
+
+class _VlmPipelineVideoChatFlashImageGuard:
+    def __init__(self, pipeline: VLMPipeline, model_id: str):
+        self._pipeline = pipeline
+        self._model_id = model_id
+
+    def generate(self, *args: Any, **kwargs: Any):
+        has_single_image = "image" in kwargs and kwargs["image"] is not None
+        has_multi_images = "images" in kwargs and kwargs["images"] is not None and len(kwargs["images"]) > 0
+        if _is_videochat_flash_model(self._model_id) and (has_single_image or has_multi_images):
+            pytest.skip("VideoChat-Flash image/image(s) tests are disabled as not supported right now, see CVS-182928. Please use video/videos input.")
+        return self._pipeline.generate(*args, **kwargs)
+
+    def __getattr__(self, name: str):
+        return getattr(self._pipeline, name)
+
+
 VIDEO_MODEL_IDS = [
     "optimum-intel-internal-testing/tiny-random-llava-next-video",
     "optimum-intel-internal-testing/tiny-random-qwen2vl",
     "optimum-intel-internal-testing/tiny-random-qwen2.5-vl",
     "optimum-intel-internal-testing/tiny-random-qwen3-vl",
+    "xf2022/tiny-videochat-flash-qwen",
 ]
 
 
@@ -130,6 +150,7 @@ IMAGE_TAG_GENERATOR_BY_MODEL: dict[str, Callable[[int], str]] = {
     "optimum-intel-internal-testing/tiny-random-qwen2vl": lambda idx: "<|vision_start|><|image_pad|><|vision_end|>",
     "optimum-intel-internal-testing/tiny-random-qwen2.5-vl": lambda idx: "<|vision_start|><|image_pad|><|vision_end|>",
     "optimum-intel-internal-testing/tiny-random-qwen3-vl": lambda idx: "<|vision_start|><|image_pad|><|vision_end|>",
+    "xf2022/tiny-videochat-flash-qwen": lambda idx: f"<|image_{idx + 1}|>\n",
     "optimum-intel-internal-testing/tiny-random-gemma3": lambda idx: "<start_of_image>",
     "optimum-intel-internal-testing/tiny-random-internvl2": lambda idx: "<image>\n",
     "optimum-intel-internal-testing/tiny-random-minicpmv-2_6": lambda idx: "<image>./</image>\n",
@@ -144,6 +165,7 @@ VIDEO_TAG_GENERATOR_BY_MODEL: dict[str, Callable[[int], str]] = {
     "optimum-intel-internal-testing/tiny-random-qwen2vl": lambda idx: "<|vision_start|><|video_pad|><|vision_end|>",
     "optimum-intel-internal-testing/tiny-random-qwen2.5-vl": lambda idx: "<|vision_start|><|video_pad|><|vision_end|>",
     "optimum-intel-internal-testing/tiny-random-qwen3-vl": lambda idx: "<|vision_start|><|video_pad|><|vision_end|>",
+    "xf2022/tiny-videochat-flash-qwen": lambda idx: f"<|image_{idx + 1}|>\n",
 }
 
 
@@ -164,6 +186,9 @@ RESOLUTION_BY_VIDEO_MODEL: dict[str, int | None] = {
 
 
 DEFAULT_RESOLUTION = 336
+
+
+VIDEOCHAT_FLASH_MODEL_ID = "xf2022/tiny-videochat-flash-qwen"
 
 
 ATTENTION_BACKEND: list[str] = ["PA", "SDPA"]
@@ -270,10 +295,11 @@ def _get_ov_model(model_id: str) -> str:
                     "optimum-intel-internal-testing/tiny-random-phi-4-multimodal",
                     "qnguyen3/nanoLLaVA",
                     "optimum-intel-internal-testing/tiny-random-MiniCPM-o-2_6",
+                    "xf2022/tiny-videochat-flash-qwen",
                 },
             )
         )
-        if model.config.model_type == "llava-qwen2":
+        if model.config.model_type == "llava-qwen2" or "videochat-flash" in model_id:
             tokenizer = transformers.AutoTokenizer.from_pretrained(model_cached, trust_remote_code=True)
         # For tiny-random-internvl2 processor is actually tokenizer
         elif isinstance(processor, transformers.Qwen2TokenizerFast):
@@ -337,6 +363,9 @@ def ov_pipe_model(request: pytest.FixtureRequest) -> VlmModelInfo:
     finally:
         if vision_preprocess_env_set:
             os.environ.pop(key, None)
+
+    pipeline = _VlmPipelineVideoChatFlashImageGuard(pipeline, ov_model)
+
     return VlmModelInfo(
         ov_model,
         ov_backend,
@@ -467,6 +496,12 @@ def ov_continious_batching_pipe_gemma() -> ContinuousBatchingPipeline:
     return ContinuousBatchingPipeline(models_path, SchedulerConfig(), "CPU")
 
 
+@pytest.fixture(scope="module")
+def ov_continious_batching_pipe_videochat() -> ContinuousBatchingPipeline:
+    models_path = _get_ov_model(VIDEOCHAT_FLASH_MODEL_ID)
+    return ContinuousBatchingPipeline(models_path, SchedulerConfig(), "CPU")
+
+
 def download_image(link: str) -> PIL.Image:
     return PIL.Image.open(requests.get(link, stream=True).raw).convert("RGB")
 
@@ -505,8 +540,8 @@ def synthetic_video(pytestconfig):
     car_url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg"
     image = from_cache_or_download(pytestconfig, car_url, "car.jpg")
 
-    # make 10 frames
-    total_frames = 10
+    # make 12 frames to fit videochat_flash's hard requirement of frame number divisible by 4
+    total_frames = 12
     frames = []
     frames.append(np.array(image))
     shift = 3
