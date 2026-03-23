@@ -8,6 +8,7 @@ from pathlib import Path
 
 def test_import_patch_pyav_for_servercore_executes_python_tests_helper():
     repository_root = Path(__file__).resolve().parents[1]
+    helper_module_path = repository_root / "tests" / "python_tests" / "patch_pyav_for_servercore.py"
     command = [
         sys.executable,
         "-c",
@@ -18,6 +19,6 @@ def test_import_patch_pyav_for_servercore_executes_python_tests_helper():
             "print(patch_module.__file__)"
         ),
     ]
-    result = subprocess.run(command, cwd=repository_root, check=True, capture_output=True, text=True)
+    result = subprocess.run(command, cwd=repository_root, check=True, capture_output=True, text=True, timeout=10)
 
-    assert Path(result.stdout.strip()).resolve() == repository_root / "tests" / "python_tests" / "patch_pyav_for_servercore.py"
+    assert Path(result.stdout.strip()).resolve() == helper_module_path
