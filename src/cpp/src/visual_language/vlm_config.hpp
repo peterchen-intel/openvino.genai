@@ -99,9 +99,9 @@ public:
     /// @brief A string token denoting start of video embeddings 
     std::string video_start = "<video>";
 
-    /// @brief A frame group size for VideoChat_Flash's local video group.
+    /// @brief A frame group size for VideoChat-Flash's local video group.
     size_t mm_local_num_frames = 4;
-    /// @brief Hidden size of VideoChat_Flash's vision encoder output.
+    /// @brief Hidden size of VideoChat-Flash's vision encoder output.
     size_t mm_hidden_size = 1408;
 
     // Qwen3-VL specific config

@@ -75,6 +75,8 @@ ov::Tensor preprocess(const ov::Tensor& input_nhwc_u8,
         ov::Tensor one_frame_u8(
             ov::element::u8,
             ov::Shape{1, in_h, in_w, channels},
+            // const_cast is safe: the Tensor only holds the pointer for reading;
+            // ov::Tensor has no const-qualified constructor for external buffers.
             const_cast<uint8_t*>(in_ptr + b * in_frame_bytes)
         );
 
@@ -441,8 +443,7 @@ ov::Tensor merge_tokens(const ov::Tensor& input, ov::InferRequest& merge_embeddi
 
     ov::Tensor current_x = input;
 
-    for (size_t r : r_merge_list) {
-        (void)r;
+    for (size_t idx = 0; idx < r_merge_list.size(); ++idx) {
         merge_embeddings.set_tensor("hidden_states", current_x);
         merge_embeddings.set_tensor("size", size_tensor);
         merge_embeddings.infer();
@@ -588,9 +589,7 @@ VisionEncoderVideoChat_Flash::VisionEncoderVideoChat_Flash(
         });
 }
 
-EncodedImage VisionEncoderVideoChat_Flash::encode(const ov::Tensor& image, const ov::AnyMap& config_map) {
-    (void)image;
-    (void)config_map;
+EncodedImage VisionEncoderVideoChat_Flash::encode(const ov::Tensor& /*image*/, const ov::AnyMap& /*config_map*/) {
     OPENVINO_THROW("VideoChat-Flash currently does not support image inference. Please use video input.");
 }
 
@@ -662,10 +661,8 @@ ov::Tensor InputsEmbedderVideoChat_Flash::get_inputs_embeds(
     const std::string& image_prompt,
     const std::vector<ov::genai::EncodedImage>& images,
     ov::genai::VLMPerfMetrics& metrics,
-    bool recalculate_merged_embeddings,
-    const std::vector<size_t>& image_sequence) {
-    (void)recalculate_merged_embeddings;
-    (void)image_sequence;
+    bool /*recalculate_merged_embeddings*/,
+    const std::vector<size_t>& /*image_sequence*/) {
 
     const size_t base_id = m_tokens_per_images.size();
     std::vector<ov::Tensor> images_features_proj;
@@ -683,11 +680,11 @@ ov::Tensor InputsEmbedderVideoChat_Flash::get_inputs_embeds(
     } else {
         std::string templated_prompt;
         if (m_apply_chat_template) {
-            ChatHistory history({{{"role", "user"}, {"content", std::move(image_prompt)}}});
+            ChatHistory history({{{"role", "user"}, {"content", image_prompt}}});
             constexpr bool add_generation_prompt = true;
             templated_prompt = m_tokenizer.apply_chat_template(history, add_generation_prompt);
         } else {
-            templated_prompt = std::move(image_prompt);
+            templated_prompt = image_prompt;
         }
         auto start_tokenizer_time = std::chrono::steady_clock::now();
         new_chat_tokens = videochat_flash_utils::split_tokenize(templated_prompt, m_tokenizer, NATIVE_PATTERN);
