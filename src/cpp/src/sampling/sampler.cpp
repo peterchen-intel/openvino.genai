@@ -638,14 +638,14 @@ void Sampler::TreeSearcher::select_top_k(const ov::Tensor& logits, SamplerOutput
         // child become parents
         m_beams = child_beams;
     } else { // at this point, we already have the full candidate tree
-        // 1. 获取topk candidates
+        // 1. Get top-k candidates
         //m_eagle2_candidate_graph->print_tree();
         auto final_candidates = m_eagle2_candidate_graph->get_top_k_candidates();
         std::sort(final_candidates.begin(), final_candidates.end(), [](const auto& a, const auto& b) {
             return a.m_tree_layer < b.m_tree_layer;
         });
         size_t topk = final_candidates.size();
-        // 2. 输出token id
+        // 2. Output token ids
         std::vector<int64_t> topk_token_ids;
         std::vector<int> position_ids;
         for (const auto& cand : final_candidates) {
@@ -660,7 +660,7 @@ void Sampler::TreeSearcher::select_top_k(const ov::Tensor& logits, SamplerOutput
         for (size_t i = 0; i < final_candidates.size(); ++i) {
             nodeid_2_index[final_candidates[i].m_node_id] = i;
         }
-        // 4. 构建retrieval indices for each leaf node
+        // 4. Build retrieval indices for each leaf node
         std::vector<std::vector<int64_t>> retrieve_indices;
         retrieve_indices.reserve(leaf_nodes.size());
         for (const auto& leaf : leaf_nodes) {

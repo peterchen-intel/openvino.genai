@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) try {
     config.max_new_tokens = 100;
     pipe.set_generation_config(config);
 
-    std::cout << "Generate with LoRA adapter and alpha set to 0.75:" << std::endl;
+    std::cout << "Generate with LoRA adapter and alpha set to 1.0:" << std::endl;
     std::cout << pipe.generate(prompt, max_new_tokens(100), adapters(adapter, 1.0)) << std::endl;
 
     std::cout << "\n-----------------------------";
