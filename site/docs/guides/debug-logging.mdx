@@ -79,10 +79,49 @@ Request_id: 0 ||| 40 0 40 20 0 0 40 40 0 20 20 20 0 40 0 0 20 80 0 80 20 0 0 0 4
 
 When a GGUF model is passed to the pipeline, the detailed debug info will also be printed.
 
+For example, when the pipeline is configured with:
+
+```cpp
+// Available in OV25.3+: enable_save_ov_model
+pipe_config["enable_save_ov_model"] = true;
+
+// Add in OV26.1: save_ov_model_quantize_mode
+pipe_config["save_ov_model_quantize_mode"] = "GPU_OPTIMIZED";
+```
+
+`"ORIGINAL"` is also supported for `save_ov_model_quantize_mode`.
+
+Recommend: save the optimized OV model to skip requant overhead in subsequent runs.
+
+Note: requantization (de-quant then quant) adds extra load-time overhead when saving the OpenVINO model.
+After the first run serializes OV models, OpenVINO GenAI `LLMPipeline` can directly reuse them
+to run requantized models on NPU or achieve better performance on GPU in subsequent runs.
+
+the output is similar to:
+
 ```sh title="Output:"
-[GGUF Reader]: Loading and unpacking model from: gguf_models/qwen2.5-0.5b-instruct-q4_0.gguf
-[GGUF Reader]: Loading and unpacking model done. Time: 196ms
+[GGUF Reader]: Save generated OpenVINO model to: <gguf_dir>/ov_model_gpu_optimized/openvino_tokenizer.xml done. Time: 8 ms
+[GGUF Reader]: Save generated OpenVINO model to: <gguf_dir>/ov_model_gpu_optimized/openvino_detokenizer.xml done. Time: 1 ms
+[GGUF Reader]: Loading and unpacking model from: <gguf_path>/<model_name>.gguf
+[GGUF Reader]: OVModelQuantizeMode: quantization_mode=GPU_OPTIMIZED, save_file=YES
+[GGUF Reader]: Loading and unpacking model done. Time: 8787ms
 [GGUF Reader]: Start generating OpenVINO model...
-[GGUF Reader]: Save generated OpenVINO model to: gguf_models/openvino_model.xml done. Time: 466 ms
-[GGUF Reader]: Model generation done. Time: 757ms
+[GGUF Reader]: Save generated OpenVINO model to: <gguf_dir>/ov_model_gpu_optimized/openvino_model.xml done. Time: 457 ms
+[GGUF Reader]: Saved OpenVINO model to: <gguf_dir>/ov_model_gpu_optimized/openvino_model.xml
+[GGUF Reader]: Model generation done. Time: 538ms
+```
+
+If `pipe_config["enable_save_ov_model"] = true` and `save_ov_model_quantize_mode` is omitted (default) or set to `ORIGINAL`,
+the output is similar to:
+
+```sh title="Output (ORIGINAL/default):"
+[GGUF Reader]: Save generated OpenVINO model to: <gguf_dir>/ov_model_original/openvino_tokenizer.xml done. Time: 5 ms
+[GGUF Reader]: Save generated OpenVINO model to: <gguf_dir>/ov_model_original/openvino_detokenizer.xml done. Time: 2 ms
+[GGUF Reader]: Loading and unpacking model from: <gguf_path>/<model_name>.gguf
+[GGUF Reader]: OVModelQuantizeMode: quantization_mode=ORIGINAL, save_file=YES
+[GGUF Reader]: Loading and unpacking model done. Time: 789ms
+[GGUF Reader]: Start generating OpenVINO model...
+[GGUF Reader]: Save generated OpenVINO model to: <gguf_dir>/ov_model_original/openvino_model.xml done. Time: 448 ms
+[GGUF Reader]: Saved OpenVINO model to: <gguf_dir>/ov_model_original/openvino_model.xml
+[GGUF Reader]: Model generation done. Time: 796ms
 ```
