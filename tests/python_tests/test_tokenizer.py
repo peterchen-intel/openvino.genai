@@ -18,7 +18,7 @@ from transformers import AutoTokenizer
 from huggingface_hub import snapshot_download
 
 from utils.constants import get_disabled_mmap_ov_config
-from utils.hugging_face import convert_and_save_tokenizer, download_and_convert_model
+from utils.hugging_face import convert_and_save_tokenizer, download_and_convert_model, TRUST_REMOTE_CODE_MODELS
 from utils.network import retry_request
 from utils.tokenizers import delete_rt_info, model_tmp_path
 
@@ -696,7 +696,7 @@ def test_load_special_tokens_from_special_tokens_map_json_with_string_repr(
     # only string representation is provided, find token integers by inference
     model_id, temp_path = model_tmp_path
     model_cached = snapshot_download(model_id)  # required to avoid HF rate limits
-    tokenizer = retry_request(lambda: AutoTokenizer.from_pretrained(model_cached, trust_remote_code=True))
+    tokenizer = retry_request(lambda: AutoTokenizer.from_pretrained(model_cached, trust_remote_code=model_id in TRUST_REMOTE_CODE_MODELS))
 
     special_tokens_map_json = {}
     token_str_int_map = {}
