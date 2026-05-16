@@ -10,6 +10,10 @@ from typing import Callable
 logger = logging.getLogger(__name__)
 
 
+def _path_exists(path: Path) -> bool:
+    return path.exists()
+
+
 class AtomicDownloadManager:
     def __init__(self, final_path: Path, is_valid_fn: Callable[[Path], bool] | None = None):
         """Create an atomic download manager.
@@ -21,7 +25,7 @@ class AtomicDownloadManager:
                 an incomplete destination before the current process promotes temp data.
         """
         self.final_path = Path(final_path)
-        self.is_valid_fn = is_valid_fn or (lambda path: path.exists())
+        self.is_valid_fn = is_valid_fn or _path_exists
         self._uses_custom_validator = is_valid_fn is not None
         random_suffix = uuid.uuid4().hex[:8]
         self.temp_path = self.final_path.parent / f".tmp_{self.final_path.name}_{random_suffix}"
@@ -70,7 +74,7 @@ class AtomicDownloadManager:
                 return
             raise
         except OSError:
-            logger.warning("Rename failed, falling back to shutil.move", exc_info=True)
+            logger.warning("Rename failed; validating destination before shutil.move fallback", exc_info=True)
 
         if self.final_path.exists():
             if self.is_complete():
@@ -113,6 +117,26 @@ def is_openvino_model_dir(path: Path) -> bool:
     """Return True when path has both OpenVINO XML and BIN model files."""
     if not path.is_dir():
         return False
-    if any(path.glob("*.xml")) and any(path.glob("*.bin")):
-        return True
-    return any(path.rglob("*.xml")) and any(path.rglob("*.bin"))
+    has_xml = False
+    has_bin = False
+
+    for entry in path.iterdir():
+        if not entry.is_file():
+            continue
+        if entry.suffix == ".xml":
+            has_xml = True
+        elif entry.suffix == ".bin":
+            has_bin = True
+        if has_xml and has_bin:
+            return True
+
+    for entry in path.rglob("*"):
+        if not entry.is_file():
+            continue
+        if entry.suffix == ".xml":
+            has_xml = True
+        elif entry.suffix == ".bin":
+            has_bin = True
+        if has_xml and has_bin:
+            return True
+    return False
