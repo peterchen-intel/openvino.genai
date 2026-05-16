@@ -120,17 +120,16 @@ def is_openvino_model_dir(path: Path) -> bool:
     """Return True when path has both OpenVINO XML and BIN model files."""
     if not path.is_dir():
         return False
-    if not any(path.iterdir()):
+    if next(path.iterdir(), None) is None:
         return False
-    has_xml = any(path.glob("*.xml"))
-    has_bin = any(path.glob("*.bin"))
-    if has_xml and has_bin:
+
+    has_xml_in_root = any(path.glob("*.xml"))
+    has_bin_in_root = any(path.glob("*.bin"))
+    if has_xml_in_root and has_bin_in_root:
         return True
 
-    if not has_xml:
-        has_xml = any(path.rglob("*.xml"))
-        if has_xml and has_bin:
-            return True
-    if not has_bin:
-        has_bin = any(path.rglob("*.bin"))
-    return has_xml and has_bin
+    if has_xml_in_root and not has_bin_in_root:
+        return any(path.rglob("*.bin"))
+    if has_bin_in_root and not has_xml_in_root:
+        return any(path.rglob("*.xml"))
+    return any(path.rglob("*.xml")) and any(path.rglob("*.bin"))
