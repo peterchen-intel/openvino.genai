@@ -11,13 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 class AtomicDownloadManager:
-    def __init__(self, final_path: Path):
+    def __init__(self, final_path: Path, is_valid_fn: Callable[[Path], bool] | None = None):
         self.final_path = Path(final_path)
+        self.is_valid_fn = is_valid_fn or (lambda path: path.exists())
         random_suffix = uuid.uuid4().hex[:8]
         self.temp_path = self.final_path.parent / f".tmp_{self.final_path.name}_{random_suffix}"
 
     def is_complete(self) -> bool:
-        return self.final_path.exists()
+        return self.is_valid_fn(self.final_path)
 
     def execute(self, download_fn: Callable[[Path], None]) -> None:
         if self.is_complete():
@@ -36,7 +37,7 @@ class AtomicDownloadManager:
             raise
 
     def _move_to_final_location(self) -> None:
-        if self.final_path.exists():
+        if self.is_complete():
             logger.info(f"Destination already exists (created by another process): {self.final_path}")
             self._cleanup_temp()
             return
@@ -44,17 +45,36 @@ class AtomicDownloadManager:
         logger.info(f"Moving temp to final location: {self.temp_path} -> {self.final_path}")
         try:
             self.temp_path.rename(self.final_path)
-        except Exception:
-            logger.warning(f"Rename failed, falling back to shutil.move")
-            if self.final_path.exists():
-                logger.info(f"Destination created by another process during rename attempt: {self.final_path}")
+            return
+        except FileExistsError:
+            if self.is_complete():
+                logger.info(f"Destination already exists: {self.final_path}")
                 self._cleanup_temp()
                 return
-            try:
-                shutil.move(str(self.temp_path), str(self.final_path))
-            except Exception:
-                logger.exception("Error during move - assuming it was created successfully by another process")
+            raise
+        except OSError:
+            logger.warning("Rename failed, falling back to shutil.move", exc_info=True)
+
+        if self.is_complete():
+            logger.info(f"Destination created by another process during rename attempt: {self.final_path}")
+            self._cleanup_temp()
+            return
+
+        try:
+            shutil.move(str(self.temp_path), str(self.final_path))
+        except FileExistsError:
+            if self.is_complete():
+                logger.info(f"Destination already exists during move: {self.final_path}")
                 self._cleanup_temp()
+                return
+            raise
+        except Exception:
+            logger.exception("Move to final location failed")
+            raise
+
+
+def is_openvino_model_dir(path: Path) -> bool:
+    return path.is_dir() and any(path.rglob("*.xml")) and any(path.rglob("*.bin"))
 
     def _cleanup_temp(self) -> None:
         if self.temp_path.exists():

@@ -26,7 +26,7 @@ from utils.constants import (
     get_ov_cache_downloaded_models_dir,
 )
 from utils.network import retry_request
-from utils.atomic_download import AtomicDownloadManager
+from utils.atomic_download import AtomicDownloadManager, is_openvino_model_dir
 
 from utils.constants import OV_MODEL_FILENAME, OV_MODEL_INDEX
 
@@ -325,7 +325,7 @@ def download_and_convert_model_class(
     ov_cache_converted_dir = get_ov_cache_converted_models_dir()
     models_path = ov_cache_converted_dir / dir_name
 
-    manager = AtomicDownloadManager(models_path)
+    manager = AtomicDownloadManager(models_path, is_valid_fn=is_openvino_model_dir)
 
     if model_kwargs is None:
         model_kwargs = {}
