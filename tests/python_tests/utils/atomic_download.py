@@ -12,6 +12,12 @@ logger = logging.getLogger(__name__)
 
 class AtomicDownloadManager:
     def __init__(self, final_path: Path, is_valid_fn: Callable[[Path], bool] | None = None):
+        """Create an atomic download manager.
+
+        Args:
+            final_path: Destination path for the final downloaded directory.
+            is_valid_fn: Optional destination validator used by `is_complete()`.
+        """
         self.final_path = Path(final_path)
         self.is_valid_fn = is_valid_fn or (lambda path: path.exists())
         random_suffix = uuid.uuid4().hex[:8]
@@ -37,10 +43,12 @@ class AtomicDownloadManager:
             raise
 
     def _move_to_final_location(self) -> None:
-        if self.is_complete():
-            logger.info(f"Destination already exists (created by another process): {self.final_path}")
-            self._cleanup_temp()
-            return
+        if self.final_path.exists():
+            if self.is_complete():
+                logger.info(f"Destination already exists (created by another process): {self.final_path}")
+                self._cleanup_temp()
+                return
+            raise FileExistsError(f"Destination exists but is incomplete: {self.final_path}")
 
         logger.info(f"Moving temp to final location: {self.temp_path} -> {self.final_path}")
         try:
@@ -55,10 +63,12 @@ class AtomicDownloadManager:
         except OSError:
             logger.warning("Rename failed, falling back to shutil.move", exc_info=True)
 
-        if self.is_complete():
-            logger.info(f"Destination created by another process during rename attempt: {self.final_path}")
-            self._cleanup_temp()
-            return
+        if self.final_path.exists():
+            if self.is_complete():
+                logger.info(f"Destination created by another process during rename attempt: {self.final_path}")
+                self._cleanup_temp()
+                return
+            raise FileExistsError(f"Destination exists but is incomplete: {self.final_path}")
 
         try:
             shutil.move(str(self.temp_path), str(self.final_path))
@@ -72,9 +82,17 @@ class AtomicDownloadManager:
             logger.exception("Move to final location failed")
             raise
 
+        if not self.is_complete():
+            raise RuntimeError(f"Destination is incomplete after move: {self.final_path}")
+
 
 def is_openvino_model_dir(path: Path) -> bool:
-    return path.is_dir() and any(path.rglob("*.xml")) and any(path.rglob("*.bin"))
+    """Return True when path looks like a converted OpenVINO model directory."""
+    if not path.is_dir():
+        return False
+    if any(path.glob("*.xml")) and any(path.glob("*.bin")):
+        return True
+    return any(path.rglob("*.xml")) and any(path.rglob("*.bin"))
 
     def _cleanup_temp(self) -> None:
         if self.temp_path.exists():
