@@ -376,6 +376,8 @@ def _get_ov_model(model_id: str) -> str:
             shutil.rmtree(model_dir)
         except OSError as error:
             pytest.fail(f"Failed to remove incomplete VLM cache at {model_dir}: {error}")
+    else:
+        logger.info("VLM cache for %s is not present at %s. Running conversion.", model_id, model_dir)
 
     def convert_to_temp(temp_dir: Path) -> None:
         model_cached = snapshot_download(model_id)  # required to avoid HF rate limits
