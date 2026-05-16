@@ -17,9 +17,12 @@ class AtomicDownloadManager:
         Args:
             final_path: Destination path for the final downloaded directory.
             is_valid_fn: Optional destination validator used by `is_complete()`.
+                Crucial in concurrent CI scenarios where another process may create
+                an incomplete destination before the current process promotes temp data.
         """
         self.final_path = Path(final_path)
         self.is_valid_fn = is_valid_fn or (lambda path: path.exists())
+        self._uses_custom_validator = is_valid_fn is not None
         random_suffix = uuid.uuid4().hex[:8]
         self.temp_path = self.final_path.parent / f".tmp_{self.final_path.name}_{random_suffix}"
 
@@ -45,7 +48,10 @@ class AtomicDownloadManager:
     def _move_to_final_location(self) -> None:
         if self.final_path.exists():
             if self.is_complete():
-                logger.info(f"Destination already exists (created by another process): {self.final_path}")
+                if self._uses_custom_validator:
+                    logger.info(f"Destination validated as complete: {self.final_path}")
+                else:
+                    logger.info(f"Destination already exists (created by another process): {self.final_path}")
                 self._cleanup_temp()
                 return
             raise FileExistsError(f"Destination exists but is incomplete: {self.final_path}")
@@ -56,7 +62,10 @@ class AtomicDownloadManager:
             return
         except FileExistsError:
             if self.is_complete():
-                logger.info(f"Destination already exists: {self.final_path}")
+                if self._uses_custom_validator:
+                    logger.info(f"Destination validated as complete during rename: {self.final_path}")
+                else:
+                    logger.info(f"Destination already exists: {self.final_path}")
                 self._cleanup_temp()
                 return
             raise
@@ -65,7 +74,10 @@ class AtomicDownloadManager:
 
         if self.final_path.exists():
             if self.is_complete():
-                logger.info(f"Destination created by another process during rename attempt: {self.final_path}")
+                if self._uses_custom_validator:
+                    logger.info(f"Destination validated as complete after rename race: {self.final_path}")
+                else:
+                    logger.info(f"Destination created by another process during rename attempt: {self.final_path}")
                 self._cleanup_temp()
                 return
             raise FileExistsError(f"Destination exists but is incomplete: {self.final_path}")
@@ -74,7 +86,10 @@ class AtomicDownloadManager:
             shutil.move(str(self.temp_path), str(self.final_path))
         except FileExistsError:
             if self.is_complete():
-                logger.info(f"Destination already exists during move: {self.final_path}")
+                if self._uses_custom_validator:
+                    logger.info(f"Destination validated as complete during move: {self.final_path}")
+                else:
+                    logger.info(f"Destination already exists during move: {self.final_path}")
                 self._cleanup_temp()
                 return
             raise
@@ -85,15 +100,6 @@ class AtomicDownloadManager:
         if not self.is_complete():
             raise RuntimeError(f"Destination is incomplete after move: {self.final_path}")
 
-
-def is_openvino_model_dir(path: Path) -> bool:
-    """Return True when path looks like a converted OpenVINO model directory."""
-    if not path.is_dir():
-        return False
-    if any(path.glob("*.xml")) and any(path.glob("*.bin")):
-        return True
-    return any(path.rglob("*.xml")) and any(path.rglob("*.bin"))
-
     def _cleanup_temp(self) -> None:
         if self.temp_path.exists():
             logger.info(f"Cleaning up temp directory: {self.temp_path}")
@@ -101,3 +107,12 @@ def is_openvino_model_dir(path: Path) -> bool:
                 shutil.rmtree(self.temp_path)
             except Exception:
                 logger.exception("Could not clean up temp directory")
+
+
+def is_openvino_model_dir(path: Path) -> bool:
+    """Return True when path has both OpenVINO XML and BIN model files."""
+    if not path.is_dir():
+        return False
+    if any(path.glob("*.xml")) and any(path.glob("*.bin")):
+        return True
+    return any(path.rglob("*.xml")) and any(path.rglob("*.bin"))
