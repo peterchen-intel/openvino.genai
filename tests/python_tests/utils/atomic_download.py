@@ -74,7 +74,10 @@ class AtomicDownloadManager:
                 return
             raise
         except OSError:
-            logger.warning("Rename failed; validating destination before shutil.move fallback", exc_info=True)
+            logger.warning(
+                "Rename failed; checking destination before attempting shutil.move fallback",
+                exc_info=True,
+            )
 
         if self.final_path.exists():
             if self.is_complete():
@@ -117,6 +120,8 @@ def is_openvino_model_dir(path: Path) -> bool:
     """Return True when path has both OpenVINO XML and BIN model files."""
     if not path.is_dir():
         return False
+    if not any(path.iterdir()):
+        return False
     has_xml = any(path.glob("*.xml"))
     has_bin = any(path.glob("*.bin"))
     if has_xml and has_bin:
@@ -124,6 +129,8 @@ def is_openvino_model_dir(path: Path) -> bool:
 
     if not has_xml:
         has_xml = any(path.rglob("*.xml"))
+        if has_xml and has_bin:
+            return True
     if not has_bin:
         has_bin = any(path.rglob("*.bin"))
     return has_xml and has_bin

@@ -45,4 +45,4 @@ def test_concurrent_incomplete_destination_rejected(tmp_path: Path) -> None:
     assert not manager.is_complete()
 
     with pytest.raises(FileExistsError, match="incomplete"):
-        manager.execute(lambda _temp_path: None)
+        manager.execute(lambda temp_path: None)
