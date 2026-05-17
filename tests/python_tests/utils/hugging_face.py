@@ -34,7 +34,7 @@ from utils.constants import OV_MODEL_FILENAME, OV_MODEL_INDEX
 
 
 def get_incomplete_ov_ir_files(model_dir: Path) -> list[str]:
-    """Return relative paths of .bin files that are missing or empty for each openvino_*.xml found recursively."""
+    """Return relative `.bin` paths that are missing or empty for each discovered `openvino_*.xml`."""
     incomplete = []
     for xml_file in sorted(model_dir.rglob("openvino_*.xml")):
         bin_file = xml_file.with_suffix(".bin")
@@ -50,11 +50,7 @@ def is_ov_model_dir_complete(model_dir: Path) -> bool:
     xml_files = list(model_dir.rglob("openvino_*.xml"))
     if not xml_files:
         return False
-    for xml_file in xml_files:
-        bin_file = xml_file.with_suffix(".bin")
-        if not bin_file.exists() or bin_file.stat().st_size == 0:
-            return False
-    return True
+    return len(get_incomplete_ov_ir_files(model_dir)) == 0
 
 
 def assert_ov_ir_completeness(model_dir: Path, model_id: str) -> None:
@@ -69,7 +65,7 @@ def assert_ov_ir_completeness(model_dir: Path, model_id: str) -> None:
 def _execute_conversion_with_ir_retry(
     models_path: Path,
     model_id: str,
-    convert_to_temp: Callable[[Path], None],
+    convert_fn: Callable[[Path], None],
     attempts: int = 2,
 ) -> None:
     """
@@ -79,8 +75,15 @@ def _execute_conversion_with_ir_retry(
     sibling ``openvino_*.bin``. On retry, removes the incomplete cache directory first.
     Fails the test when all attempts are exhausted.
     """
+    cache_root = get_ov_cache_converted_models_dir().resolve()
+    resolved_models_path = models_path.resolve()
+    try:
+        resolved_models_path.relative_to(cache_root)
+    except ValueError as error:
+        raise RuntimeError(f"Refusing to clean non-cache path: {resolved_models_path}") from error
+
     for attempt in range(attempts):
-        AtomicDownloadManager(models_path).execute(convert_to_temp)
+        AtomicDownloadManager(models_path).execute(convert_fn)
         incomplete = get_incomplete_ov_ir_files(models_path)
         if not incomplete:
             return
