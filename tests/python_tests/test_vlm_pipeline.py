@@ -71,7 +71,7 @@ from utils.constants import get_ov_cache_converted_models_dir
 from utils.atomic_download import AtomicDownloadManager
 from utils.custom_op import assert_ir_contains_op_type, get_extension_model, get_extension_lib_path, CustomAdd
 from utils.ov_genai_pipelines import should_skip_npuw_tests
-from utils.hugging_face import get_incomplete_ov_ir_files, is_ov_model_dir_complete
+from utils.hugging_face import is_ov_model_dir_complete, assert_ov_ir_completeness
 
 import logging
 logger = logging.getLogger(__name__)
@@ -430,12 +430,7 @@ def _get_ov_model(model_id: str) -> str:
         model.save_pretrained(temp_dir)
 
     manager.execute(convert_to_temp)
-    incomplete_ir_files = get_incomplete_ov_ir_files(model_dir)
-    if incomplete_ir_files:
-        pytest.fail(
-            f"Converted VLM cache is incomplete for {model_id} at {model_dir}. "
-            f"Missing or empty .bin files: {', '.join(incomplete_ir_files)}"
-        )
+    assert_ov_ir_completeness(model_dir, model_id)
     return model_dir
 
 # On macOS, transformers<4.52 is required, but this causes gemma3 to fail
