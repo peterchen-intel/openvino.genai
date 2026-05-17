@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Type
+from typing import Callable, Type
 import subprocess  # nosec B404
 import shutil
 
@@ -69,19 +69,26 @@ def assert_ov_ir_completeness(model_dir: Path, model_id: str) -> None:
 def _execute_conversion_with_ir_retry(
     models_path: Path,
     model_id: str,
-    convert_to_temp,
+    convert_to_temp: Callable[[Path], None],
     attempts: int = 2,
 ) -> None:
-    for attempt in range(1, attempts + 1):
+    """
+    Run conversion to ``models_path`` and validate OpenVINO IR completeness.
+
+    Retries conversion when any discovered ``openvino_*.xml`` has a missing or empty
+    sibling ``openvino_*.bin``. On retry, removes the incomplete cache directory first.
+    Fails the test when all attempts are exhausted.
+    """
+    for attempt in range(attempts):
         AtomicDownloadManager(models_path).execute(convert_to_temp)
         incomplete = get_incomplete_ov_ir_files(models_path)
         if not incomplete:
             return
-        if attempt < attempts:
+        if attempt < attempts - 1:
             try:
                 shutil.rmtree(models_path)
             except OSError as error:
-                pytest.fail(f"Failed to remove incomplete model cache at {models_path}: {error}")
+                raise RuntimeError(f"Failed to remove incomplete model cache at {models_path}") from error
         else:
             pytest.fail(
                 f"Converted OpenVINO IR is incomplete for {model_id} at {models_path}. "
