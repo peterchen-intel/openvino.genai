@@ -76,6 +76,8 @@ def _execute_conversion_with_ir_retry(
     Fails the test when all attempts are exhausted.
 
     Parameters:
+        models_path: Final converted-model cache directory path.
+        model_id: Model identifier used in failure messages.
         convert_fn: Callable accepting a single Path conversion directory argument.
         attempts: Maximum number of conversion attempts (default: 2).
     """
@@ -103,10 +105,7 @@ def _execute_conversion_with_ir_retry(
                     f"Failed to remove incomplete model cache directory during conversion retry at {models_path}: {error}"
                 ) from error
         else:
-            pytest.fail(
-                f"Converted OpenVINO IR is incomplete for {model_id} at {models_path}. "
-                f"Missing or empty .bin files: {', '.join(incomplete)}"
-            )
+            assert_ov_ir_completeness(models_path, model_id)
 
 
 @dataclass(frozen=True)
@@ -409,11 +408,21 @@ def download_and_convert_model_class(
     if "has_tokenizer" not in model_kwargs and "eagle3" in str(model_id).lower():
         model_kwargs["has_tokenizer"] = False
 
-    if AtomicDownloadManager(models_path).is_complete() or (models_path / OV_MODEL_FILENAME).exists() or (models_path / OV_MODEL_INDEX).exists():
+    has_cached_model = (
+        AtomicDownloadManager(models_path).is_complete()
+        or (models_path / OV_MODEL_FILENAME).exists()
+        or (models_path / OV_MODEL_INDEX).exists()
+    )
+    if has_cached_model and is_ov_model_dir_complete(models_path):
         opt_model, hf_tokenizer = get_huggingface_models(
             models_path, model_class, local_files_only=True, trust_remote_code=trust_remote_code, **model_kwargs
         )
     else:
+        if has_cached_model and models_path.exists():
+            try:
+                shutil.rmtree(models_path)
+            except OSError as error:
+                pytest.fail(f"Failed to remove incomplete model cache at {models_path}: {error}")
         if model_id in FORCE_OPTIMUM_CLI_EXPORT_MODELS:
             model_task = FORCE_OPTIMUM_CLI_EXPORT_MODELS[model_id]
 
