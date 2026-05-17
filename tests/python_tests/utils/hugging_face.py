@@ -1,10 +1,14 @@
 # Copyright (C) 2018-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Type
 import subprocess  # nosec B404
+
+logger = logging.getLogger(__name__)
 
 from optimum.modeling_base import OptimizedModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -27,8 +31,6 @@ from utils.constants import (
 )
 from utils.network import retry_request
 from utils.atomic_download import AtomicDownloadManager
-
-from utils.constants import OV_MODEL_FILENAME, OV_MODEL_INDEX
 
 
 @dataclass(frozen=True)
@@ -283,6 +285,13 @@ def sanitize_model_id(model_id: str) -> str:
     return model_id.replace("/", "_")
 
 
+def has_valid_ov_model(models_path: Path) -> bool:
+    """Return True when *models_path* contains at least 3 ``openvino_*.xml`` files
+    (searched recursively) and every XML file has a corresponding ``.bin`` file."""
+    xml_files = list(models_path.rglob("openvino_*.xml"))
+    return len(xml_files) >= 3 and all(f.with_suffix(".bin").exists() for f in xml_files)
+
+
 TRUST_REMOTE_CODE_MODELS = ("AngelSlim/Qwen3-1.7B_eagle3",)
 
 # Some models require optimum-cli export instead of the Python API path.
@@ -333,7 +342,11 @@ def download_and_convert_model_class(
     if "has_tokenizer" not in model_kwargs and "eagle3" in str(model_id).lower():
         model_kwargs["has_tokenizer"] = False
 
-    if manager.is_complete() or (models_path / OV_MODEL_FILENAME).exists() or (models_path / OV_MODEL_INDEX).exists():
+    if manager.is_complete() and not has_valid_ov_model(models_path):
+        logger.warning("Removing incomplete model directory for retry: %s", models_path)
+        shutil.rmtree(models_path)
+
+    if has_valid_ov_model(models_path):
         opt_model, hf_tokenizer = get_huggingface_models(
             models_path, model_class, local_files_only=True, trust_remote_code=trust_remote_code, **model_kwargs
         )
