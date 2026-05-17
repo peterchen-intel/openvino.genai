@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Type
 import subprocess  # nosec B404
+import shutil
 
 import pytest
 from optimum.modeling_base import OptimizedModel
@@ -63,6 +64,29 @@ def assert_ov_ir_completeness(model_dir: Path, model_id: str) -> None:
             f"Converted OpenVINO IR is incomplete for {model_id} at {model_dir}. "
             f"Missing or empty .bin files: {', '.join(incomplete)}"
         )
+
+
+def _execute_conversion_with_ir_retry(
+    models_path: Path,
+    model_id: str,
+    convert_to_temp,
+    attempts: int = 2,
+) -> None:
+    for attempt in range(1, attempts + 1):
+        AtomicDownloadManager(models_path).execute(convert_to_temp)
+        incomplete = get_incomplete_ov_ir_files(models_path)
+        if not incomplete:
+            return
+        if attempt < attempts:
+            try:
+                shutil.rmtree(models_path)
+            except OSError as error:
+                pytest.fail(f"Failed to remove incomplete model cache at {models_path}: {error}")
+        else:
+            pytest.fail(
+                f"Converted OpenVINO IR is incomplete for {model_id} at {models_path}. "
+                f"Missing or empty .bin files: {', '.join(incomplete)}"
+            )
 
 
 @dataclass(frozen=True)
@@ -359,15 +383,13 @@ def download_and_convert_model_class(
     ov_cache_converted_dir = get_ov_cache_converted_models_dir()
     models_path = ov_cache_converted_dir / dir_name
 
-    manager = AtomicDownloadManager(models_path)
-
     if model_kwargs is None:
         model_kwargs = {}
 
     if "has_tokenizer" not in model_kwargs and "eagle3" in str(model_id).lower():
         model_kwargs["has_tokenizer"] = False
 
-    if manager.is_complete() or (models_path / OV_MODEL_FILENAME).exists() or (models_path / OV_MODEL_INDEX).exists():
+    if AtomicDownloadManager(models_path).is_complete() or (models_path / OV_MODEL_FILENAME).exists() or (models_path / OV_MODEL_INDEX).exists():
         opt_model, hf_tokenizer = get_huggingface_models(
             models_path, model_class, local_files_only=True, trust_remote_code=trust_remote_code, **model_kwargs
         )
@@ -378,8 +400,7 @@ def download_and_convert_model_class(
             def convert_to_temp(temp_path: Path) -> None:
                 export_with_optimum_cli(model_id, model_task, temp_path, trust_remote_code=trust_remote_code)
 
-            manager.execute(convert_to_temp)
-            assert_ov_ir_completeness(models_path, model_id)
+            _execute_conversion_with_ir_retry(models_path, model_id, convert_to_temp)
             opt_model, hf_tokenizer = get_huggingface_models(
                 models_path, model_class, local_files_only=True, trust_remote_code=trust_remote_code, **model_kwargs
             )
@@ -395,8 +416,7 @@ def download_and_convert_model_class(
             def convert_to_temp(temp_path: Path) -> None:
                 convert_models(opt_model, hf_tokenizer, temp_path)
 
-            manager.execute(convert_to_temp)
-            assert_ov_ir_completeness(models_path, model_id)
+            _execute_conversion_with_ir_retry(models_path, model_id, convert_to_temp)
 
     if "padding_side" in tokenizer_kwargs:
         if hf_tokenizer is None:
