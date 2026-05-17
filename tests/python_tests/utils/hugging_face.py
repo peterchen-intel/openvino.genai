@@ -34,7 +34,7 @@ from utils.constants import OV_MODEL_FILENAME, OV_MODEL_INDEX
 
 
 def get_incomplete_ov_ir_files(model_dir: Path) -> list[str]:
-    """Return relative `.bin` paths that are missing or empty for each discovered `openvino_*.xml`."""
+    """Return sorted relative `.bin` paths (to model_dir) missing/empty for discovered `openvino_*.xml`."""
     incomplete = []
     for xml_file in sorted(model_dir.rglob("openvino_*.xml")):
         bin_file = xml_file.with_suffix(".bin")
@@ -44,7 +44,7 @@ def get_incomplete_ov_ir_files(model_dir: Path) -> list[str]:
 
 
 def is_ov_model_dir_complete(model_dir: Path) -> bool:
-    """Return True if model_dir exists, has at least one openvino_*.xml, and all have valid .bin counterparts."""
+    """Return True when model_dir has >=1 `openvino_*.xml` and each has a non-empty `.bin` counterpart."""
     if not model_dir.exists():
         return False
     xml_files = list(model_dir.rglob("openvino_*.xml"))
@@ -74,6 +74,10 @@ def _execute_conversion_with_ir_retry(
     Retries conversion when any discovered ``openvino_*.xml`` has a missing or empty
     sibling ``openvino_*.bin``. On retry, removes the incomplete cache directory first.
     Fails the test when all attempts are exhausted.
+
+    Parameters:
+        convert_fn: Callable accepting a single Path conversion directory argument.
+        attempts: Maximum number of conversion attempts (default: 2).
     """
     cache_root = get_ov_cache_converted_models_dir().resolve()
     resolved_models_path = models_path.resolve()
@@ -82,8 +86,8 @@ def _execute_conversion_with_ir_retry(
     except ValueError as error:
         raise RuntimeError(
             "Safety check failed: models_path must be under the converted cache directory "
-            f"to prevent accidental deletion of non-cache files. Got {resolved_models_path}, "
-            f"expected path under {cache_root}"
+            f"to prevent accidental deletion. Ensure models_path is a subdirectory of {cache_root}. "
+            f"Got: {resolved_models_path}"
         ) from error
 
     for attempt in range(attempts):
@@ -95,7 +99,9 @@ def _execute_conversion_with_ir_retry(
             try:
                 shutil.rmtree(models_path)
             except OSError as error:
-                raise RuntimeError(f"Failed to remove incomplete model cache at {models_path}: {error}") from error
+                raise RuntimeError(
+                    f"Failed to remove incomplete model cache directory during conversion retry at {models_path}: {error}"
+                ) from error
         else:
             pytest.fail(
                 f"Converted OpenVINO IR is incomplete for {model_id} at {models_path}. "
