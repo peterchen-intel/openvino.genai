@@ -31,6 +31,25 @@ from utils.atomic_download import AtomicDownloadManager
 from utils.constants import OV_MODEL_FILENAME, OV_MODEL_INDEX
 
 
+def get_incomplete_ov_ir_files(model_dir: Path) -> list[str]:
+    """Return relative paths of .bin files that are missing or empty for each openvino_*.xml found recursively."""
+    incomplete = []
+    for xml_file in sorted(model_dir.rglob("openvino_*.xml")):
+        bin_file = xml_file.with_suffix(".bin")
+        if not bin_file.exists() or bin_file.stat().st_size == 0:
+            incomplete.append(str(bin_file.relative_to(model_dir)))
+    return incomplete
+
+
+def _assert_ov_ir_completeness(model_dir: Path, model_id: str) -> None:
+    incomplete = get_incomplete_ov_ir_files(model_dir)
+    if incomplete:
+        raise RuntimeError(
+            f"Converted OpenVINO IR is incomplete for {model_id} at {model_dir}. "
+            f"Missing or empty .bin files: {', '.join(incomplete)}"
+        )
+
+
 @dataclass(frozen=True)
 class OVConvertedModelSchema:
     model_id: str
@@ -345,6 +364,7 @@ def download_and_convert_model_class(
                 export_with_optimum_cli(model_id, model_task, temp_path, trust_remote_code=trust_remote_code)
 
             manager.execute(convert_to_temp)
+            _assert_ov_ir_completeness(models_path, model_id)
             opt_model, hf_tokenizer = get_huggingface_models(
                 models_path, model_class, local_files_only=True, trust_remote_code=trust_remote_code, **model_kwargs
             )
@@ -361,6 +381,7 @@ def download_and_convert_model_class(
                 convert_models(opt_model, hf_tokenizer, temp_path)
 
             manager.execute(convert_to_temp)
+            _assert_ov_ir_completeness(models_path, model_id)
 
     if "padding_side" in tokenizer_kwargs:
         if hf_tokenizer is None:

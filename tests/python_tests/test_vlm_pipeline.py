@@ -71,22 +71,10 @@ from utils.constants import get_ov_cache_converted_models_dir
 from utils.atomic_download import AtomicDownloadManager
 from utils.custom_op import assert_ir_contains_op_type, get_extension_model, get_extension_lib_path, CustomAdd
 from utils.ov_genai_pipelines import should_skip_npuw_tests
+from utils.hugging_face import get_incomplete_ov_ir_files
 
 import logging
 logger = logging.getLogger(__name__)
-
-VLM_REQUIRED_CACHE_ARTIFACTS = (
-    "openvino_language_model.xml",
-    "openvino_language_model.bin",
-    "openvino_tokenizer.xml",
-    "openvino_tokenizer.bin",
-    "openvino_detokenizer.xml",
-    "openvino_detokenizer.bin",
-)
-
-
-def _get_missing_vlm_cache_artifacts(model_dir: Path) -> list[str]:
-    return [artifact for artifact in VLM_REQUIRED_CACHE_ARTIFACTS if not (model_dir / artifact).exists()]
 
 
 class VisionType(Enum):
@@ -362,12 +350,12 @@ def _get_ov_model(model_id: str) -> str:
     model_dir = ov_cache_converted_dir / dir_name
     manager = AtomicDownloadManager(model_dir)
 
-    missing_artifacts = _get_missing_vlm_cache_artifacts(model_dir)
-    if not missing_artifacts:
+    missing_artifacts = get_incomplete_ov_ir_files(model_dir)
+    if not missing_artifacts and model_dir.exists() and any(model_dir.rglob("openvino_*.xml")):
         return model_dir
     if model_dir.exists():
         logger.warning(
-            "Incomplete VLM cache for %s at %s. Missing artifacts: %s. Re-running conversion.",
+            "Incomplete VLM cache for %s at %s. Missing or empty .bin files: %s. Re-running conversion.",
             model_id,
             model_dir,
             ", ".join(missing_artifacts),
@@ -444,11 +432,11 @@ def _get_ov_model(model_id: str) -> str:
         model.save_pretrained(temp_dir)
 
     manager.execute(convert_to_temp)
-    missing_artifacts = _get_missing_vlm_cache_artifacts(model_dir)
-    if missing_artifacts:
+    incomplete_ir_files = get_incomplete_ov_ir_files(model_dir)
+    if incomplete_ir_files:
         pytest.fail(
             f"Converted VLM cache is incomplete for {model_id} at {model_dir}. "
-            f"Missing artifacts: {', '.join(missing_artifacts)}"
+            f"Missing or empty .bin files: {', '.join(incomplete_ir_files)}"
         )
     return model_dir
 
