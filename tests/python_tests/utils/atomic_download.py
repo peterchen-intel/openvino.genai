@@ -44,6 +44,8 @@ class AtomicDownloadManager:
         return cls._instances[key]
 
     def __init__(self, final_path: Path, timeout: float = _DEFAULT_TIMEOUT) -> None:
+        # NOTE: subsequent calls with a different timeout are silently ignored because
+        # the singleton returns the existing instance with the original timeout.
         if hasattr(self, "_initialized"):
             return
         self._initialized = True
@@ -109,18 +111,19 @@ class AtomicDownloadManager:
     def force_stop(self) -> None:
         """Force stop: release the lock and remove the temp directory and state."""
         logger.info("Force stopping download for %s", self.final_path)
-        self._cleanup_temp()
-        self._release_file_lock()
-        try:
-            if self._lock_file.exists():
-                self._lock_file.unlink()
-        except Exception:
-            logger.exception("Error removing lock file")
-        try:
-            if self._state_dir.exists():
-                shutil.rmtree(self._state_dir)
-        except Exception:
-            logger.exception("Error removing state directory")
+        with self._instance_lock:
+            self._cleanup_temp()
+            self._release_file_lock()
+            try:
+                if self._lock_file.exists():
+                    self._lock_file.unlink()
+            except Exception:
+                logger.exception("Error removing lock file")
+            try:
+                if self._state_dir.exists():
+                    shutil.rmtree(self._state_dir)
+            except Exception:
+                logger.exception("Error removing state directory")
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -134,12 +137,14 @@ class AtomicDownloadManager:
             try:
                 fd = open(self._lock_file, "w")  # noqa: WPS515
                 if _HAS_FCNTL:
-                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    except Exception:
+                        fd.close()
+                        raise
                 self._lock_fd = fd
                 return True
             except OSError:
-                if fd is not None:
-                    fd.close()
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     return False
