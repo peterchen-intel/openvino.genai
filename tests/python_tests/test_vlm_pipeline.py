@@ -353,12 +353,10 @@ def _get_ov_model(model_id: str) -> str:
     if is_ov_model_dir_complete(model_dir):
         return model_dir
     if model_dir.exists():
-        incomplete = get_incomplete_ov_ir_files(model_dir)
         logger.warning(
-            "Incomplete VLM cache for %s at %s. Missing or empty .bin files: %s. Re-running conversion.",
+            "Incomplete VLM cache for %s at %s. Re-running conversion.",
             model_id,
             model_dir,
-            ", ".join(incomplete),
         )
         try:
             shutil.rmtree(model_dir)

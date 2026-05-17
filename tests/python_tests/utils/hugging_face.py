@@ -49,7 +49,7 @@ def is_ov_model_dir_complete(model_dir: Path) -> bool:
     if not xml_files:
         return False
     return all(
-        xml_file.with_suffix(".bin").exists() and xml_file.with_suffix(".bin").stat().st_size > 0
+        (bin_file := xml_file.with_suffix(".bin")).exists() and bin_file.stat().st_size > 0
         for xml_file in xml_files
     )
 
