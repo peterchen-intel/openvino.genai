@@ -80,7 +80,11 @@ def _execute_conversion_with_ir_retry(
     try:
         resolved_models_path.relative_to(cache_root)
     except ValueError as error:
-        raise RuntimeError(f"Refusing to clean non-cache path: {resolved_models_path}") from error
+        raise RuntimeError(
+            "Safety check failed: models_path must be under the converted cache directory "
+            f"to prevent accidental deletion of non-cache files. Got {resolved_models_path}, "
+            f"expected path under {cache_root}"
+        ) from error
 
     for attempt in range(attempts):
         AtomicDownloadManager(models_path).execute(convert_fn)
@@ -91,7 +95,7 @@ def _execute_conversion_with_ir_retry(
             try:
                 shutil.rmtree(models_path)
             except OSError as error:
-                raise RuntimeError(f"Failed to remove incomplete model cache at {models_path}") from error
+                raise RuntimeError(f"Failed to remove incomplete model cache at {models_path}: {error}") from error
         else:
             pytest.fail(
                 f"Converted OpenVINO IR is incomplete for {model_id} at {models_path}. "
