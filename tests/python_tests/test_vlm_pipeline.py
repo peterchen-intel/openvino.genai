@@ -71,7 +71,7 @@ from utils.constants import get_ov_cache_converted_models_dir
 from utils.atomic_download import AtomicDownloadManager
 from utils.custom_op import assert_ir_contains_op_type, get_extension_model, get_extension_lib_path, CustomAdd
 from utils.ov_genai_pipelines import should_skip_npuw_tests
-from utils.hugging_face import get_incomplete_ov_ir_files
+from utils.hugging_face import get_incomplete_ov_ir_files, is_ov_model_dir_complete
 
 import logging
 logger = logging.getLogger(__name__)
@@ -350,15 +350,15 @@ def _get_ov_model(model_id: str) -> str:
     model_dir = ov_cache_converted_dir / dir_name
     manager = AtomicDownloadManager(model_dir)
 
-    missing_artifacts = get_incomplete_ov_ir_files(model_dir)
-    if not missing_artifacts and model_dir.exists() and any(model_dir.rglob("openvino_*.xml")):
+    if is_ov_model_dir_complete(model_dir):
         return model_dir
     if model_dir.exists():
+        incomplete = get_incomplete_ov_ir_files(model_dir)
         logger.warning(
             "Incomplete VLM cache for %s at %s. Missing or empty .bin files: %s. Re-running conversion.",
             model_id,
             model_dir,
-            ", ".join(missing_artifacts),
+            ", ".join(incomplete),
         )
         try:
             shutil.rmtree(model_dir)

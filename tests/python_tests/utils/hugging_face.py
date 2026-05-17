@@ -41,6 +41,19 @@ def get_incomplete_ov_ir_files(model_dir: Path) -> list[str]:
     return incomplete
 
 
+def is_ov_model_dir_complete(model_dir: Path) -> bool:
+    """Return True if model_dir exists, has at least one openvino_*.xml, and all have valid .bin counterparts."""
+    if not model_dir.exists():
+        return False
+    xml_files = list(model_dir.rglob("openvino_*.xml"))
+    if not xml_files:
+        return False
+    return all(
+        xml_file.with_suffix(".bin").exists() and xml_file.with_suffix(".bin").stat().st_size > 0
+        for xml_file in xml_files
+    )
+
+
 def _assert_ov_ir_completeness(model_dir: Path, model_id: str) -> None:
     incomplete = get_incomplete_ov_ir_files(model_dir)
     if incomplete:
