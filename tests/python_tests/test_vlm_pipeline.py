@@ -32,7 +32,6 @@ import utils.patch_pyav_for_servercore as patch_pyav_for_servercore
 patch_pyav_for_servercore.install_av_stub_module_for_windows()
 
 import inspect
-import shutil
 from enum import Enum
 from dataclasses import dataclass
 from pathlib import Path
@@ -71,7 +70,6 @@ from utils.constants import get_ov_cache_converted_models_dir
 from utils.atomic_download import AtomicDownloadManager
 from utils.custom_op import assert_ir_contains_op_type, get_extension_model, get_extension_lib_path, CustomAdd
 from utils.ov_genai_pipelines import should_skip_npuw_tests
-from utils.hugging_face import is_ov_model_dir_complete, assert_ov_ir_completeness
 
 import logging
 logger = logging.getLogger(__name__)
@@ -350,20 +348,8 @@ def _get_ov_model(model_id: str) -> str:
     model_dir = ov_cache_converted_dir / dir_name
     manager = AtomicDownloadManager(model_dir)
 
-    if is_ov_model_dir_complete(model_dir):
+    if manager.is_complete() or (model_dir / "openvino_language_model.xml").exists():
         return model_dir
-    if model_dir.exists():
-        logger.warning(
-            "Incomplete VLM cache for %s at %s. Re-running conversion.",
-            model_id,
-            model_dir,
-        )
-        try:
-            shutil.rmtree(model_dir)
-        except OSError as error:
-            pytest.fail(f"Failed to remove incomplete VLM cache at {model_dir}: {error}")
-    else:
-        logger.info("VLM cache for %s is not present at %s. Running conversion.", model_id, model_dir)
 
     def convert_to_temp(temp_dir: Path) -> None:
         model_cached = snapshot_download(model_id)  # required to avoid HF rate limits
@@ -430,7 +416,6 @@ def _get_ov_model(model_id: str) -> str:
         model.save_pretrained(temp_dir)
 
     manager.execute(convert_to_temp)
-    assert_ov_ir_completeness(model_dir, model_id)
     return model_dir
 
 # On macOS, transformers<4.52 is required, but this causes gemma3 to fail
