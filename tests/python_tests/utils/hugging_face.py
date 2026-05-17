@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Type
 import subprocess  # nosec B404
 
+import pytest
 from optimum.modeling_base import OptimizedModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers import GenerationConfig as HFGenerationConfig
@@ -29,8 +30,6 @@ from utils.network import retry_request
 from utils.atomic_download import AtomicDownloadManager
 
 from utils.constants import OV_MODEL_FILENAME, OV_MODEL_INDEX
-
-import pytest
 
 
 def get_incomplete_ov_ir_files(model_dir: Path) -> list[str]:
