@@ -3,9 +3,11 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Type
+from typing import Callable, Type
 import subprocess  # nosec B404
+import shutil
 
+import pytest
 from optimum.modeling_base import OptimizedModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers import GenerationConfig as HFGenerationConfig
@@ -29,6 +31,81 @@ from utils.network import retry_request
 from utils.atomic_download import AtomicDownloadManager
 
 from utils.constants import OV_MODEL_FILENAME, OV_MODEL_INDEX
+
+
+def get_incomplete_ov_ir_files(model_dir: Path) -> list[str]:
+    """Return sorted relative `.bin` paths (to model_dir) missing/empty for discovered `openvino_*.xml`."""
+    incomplete = []
+    for xml_file in sorted(model_dir.rglob("openvino_*.xml")):
+        bin_file = xml_file.with_suffix(".bin")
+        if not bin_file.exists() or bin_file.stat().st_size == 0:
+            incomplete.append(str(bin_file.relative_to(model_dir)))
+    return incomplete
+
+
+def is_ov_model_dir_complete(model_dir: Path) -> bool:
+    """Return True when model_dir has >=1 `openvino_*.xml` and each has a non-empty `.bin` counterpart."""
+    if not model_dir.exists():
+        return False
+    xml_files = list(model_dir.rglob("openvino_*.xml"))
+    if not xml_files:
+        return False
+    return len(get_incomplete_ov_ir_files(model_dir)) == 0
+
+
+def assert_ov_ir_completeness(model_dir: Path, model_id: str) -> None:
+    incomplete = get_incomplete_ov_ir_files(model_dir)
+    if incomplete:
+        pytest.fail(
+            f"Converted OpenVINO IR is incomplete for {model_id} at {model_dir}. "
+            f"Missing or empty .bin files: {', '.join(incomplete)}"
+        )
+
+
+def _execute_conversion_with_ir_retry(
+    models_path: Path,
+    model_id: str,
+    convert_fn: Callable[[Path], None],
+    attempts: int = 2,
+) -> None:
+    """
+    Run conversion to ``models_path`` and validate OpenVINO IR completeness.
+
+    Retries conversion when any discovered ``openvino_*.xml`` has a missing or empty
+    sibling ``openvino_*.bin``. On retry, removes the incomplete cache directory first.
+    Fails the test when all attempts are exhausted.
+
+    Parameters:
+        models_path: Final converted-model cache directory path.
+        model_id: Model identifier used in failure messages.
+        convert_fn: Callable accepting a single Path conversion directory argument.
+        attempts: Maximum number of conversion attempts (default: 2).
+    """
+    cache_root = get_ov_cache_converted_models_dir().resolve()
+    resolved_models_path = models_path.resolve()
+    try:
+        resolved_models_path.relative_to(cache_root)
+    except ValueError as error:
+        raise RuntimeError(
+            "Safety check failed: models_path must be under the converted cache directory "
+            f"to prevent accidental deletion. Ensure models_path is a subdirectory of {cache_root}. "
+            f"Got: {resolved_models_path}"
+        ) from error
+
+    for attempt in range(attempts):
+        AtomicDownloadManager(models_path).execute(convert_fn)
+        incomplete = get_incomplete_ov_ir_files(models_path)
+        if not incomplete:
+            return
+        if attempt < attempts - 1:
+            try:
+                shutil.rmtree(models_path)
+            except OSError as error:
+                raise RuntimeError(
+                    f"Failed to remove incomplete model cache directory during conversion retry at {models_path}: {error}"
+                ) from error
+        else:
+            assert_ov_ir_completeness(models_path, model_id)
 
 
 @dataclass(frozen=True)
@@ -325,26 +402,34 @@ def download_and_convert_model_class(
     ov_cache_converted_dir = get_ov_cache_converted_models_dir()
     models_path = ov_cache_converted_dir / dir_name
 
-    manager = AtomicDownloadManager(models_path)
-
     if model_kwargs is None:
         model_kwargs = {}
 
     if "has_tokenizer" not in model_kwargs and "eagle3" in str(model_id).lower():
         model_kwargs["has_tokenizer"] = False
 
-    if manager.is_complete() or (models_path / OV_MODEL_FILENAME).exists() or (models_path / OV_MODEL_INDEX).exists():
+    has_cached_model = (
+        AtomicDownloadManager(models_path).is_complete()
+        or (models_path / OV_MODEL_FILENAME).exists()
+        or (models_path / OV_MODEL_INDEX).exists()
+    )
+    if has_cached_model and is_ov_model_dir_complete(models_path):
         opt_model, hf_tokenizer = get_huggingface_models(
             models_path, model_class, local_files_only=True, trust_remote_code=trust_remote_code, **model_kwargs
         )
     else:
+        if has_cached_model and models_path.exists():
+            try:
+                shutil.rmtree(models_path)
+            except OSError as error:
+                pytest.fail(f"Failed to remove incomplete model cache at {models_path}: {error}")
         if model_id in FORCE_OPTIMUM_CLI_EXPORT_MODELS:
             model_task = FORCE_OPTIMUM_CLI_EXPORT_MODELS[model_id]
 
             def convert_to_temp(temp_path: Path) -> None:
                 export_with_optimum_cli(model_id, model_task, temp_path, trust_remote_code=trust_remote_code)
 
-            manager.execute(convert_to_temp)
+            _execute_conversion_with_ir_retry(models_path, model_id, convert_to_temp)
             opt_model, hf_tokenizer = get_huggingface_models(
                 models_path, model_class, local_files_only=True, trust_remote_code=trust_remote_code, **model_kwargs
             )
@@ -360,7 +445,7 @@ def download_and_convert_model_class(
             def convert_to_temp(temp_path: Path) -> None:
                 convert_models(opt_model, hf_tokenizer, temp_path)
 
-            manager.execute(convert_to_temp)
+            _execute_conversion_with_ir_retry(models_path, model_id, convert_to_temp)
 
     if "padding_side" in tokenizer_kwargs:
         if hf_tokenizer is None:
