@@ -10,14 +10,28 @@ from typing import Callable
 logger = logging.getLogger(__name__)
 
 
+def _path_exists(path: Path) -> bool:
+    return path.exists()
+
+
 class AtomicDownloadManager:
-    def __init__(self, final_path: Path):
+    def __init__(self, final_path: Path, is_valid_fn: Callable[[Path], bool] | None = None):
+        """Create an atomic download manager.
+
+        Args:
+            final_path: Destination path for the final downloaded directory.
+            is_valid_fn: Optional destination validator used by `is_complete()`.
+                Crucial in concurrent CI scenarios where another process may create
+                an incomplete destination before the current process promotes temp data.
+        """
         self.final_path = Path(final_path)
+        self.is_valid_fn = is_valid_fn or _path_exists
+        self._uses_custom_validator = is_valid_fn is not None
         random_suffix = uuid.uuid4().hex[:8]
         self.temp_path = self.final_path.parent / f".tmp_{self.final_path.name}_{random_suffix}"
 
     def is_complete(self) -> bool:
-        return self.final_path.exists()
+        return self.is_valid_fn(self.final_path)
 
     def execute(self, download_fn: Callable[[Path], None]) -> None:
         if self.is_complete():
@@ -37,24 +51,61 @@ class AtomicDownloadManager:
 
     def _move_to_final_location(self) -> None:
         if self.final_path.exists():
-            logger.info(f"Destination already exists (created by another process): {self.final_path}")
-            self._cleanup_temp()
-            return
+            if self.is_complete():
+                if self._uses_custom_validator:
+                    logger.info(f"Destination validated as complete: {self.final_path}")
+                else:
+                    logger.info(f"Destination already exists (created by another process): {self.final_path}")
+                self._cleanup_temp()
+                return
+            raise FileExistsError(f"Destination exists but is incomplete: {self.final_path}")
 
         logger.info(f"Moving temp to final location: {self.temp_path} -> {self.final_path}")
         try:
             self.temp_path.rename(self.final_path)
-        except Exception:
-            logger.warning(f"Rename failed, falling back to shutil.move")
-            if self.final_path.exists():
-                logger.info(f"Destination created by another process during rename attempt: {self.final_path}")
+            return
+        except FileExistsError:
+            if self.is_complete():
+                if self._uses_custom_validator:
+                    logger.info(f"Destination validated as complete during rename: {self.final_path}")
+                else:
+                    logger.info(f"Destination already exists: {self.final_path}")
                 self._cleanup_temp()
                 return
-            try:
-                shutil.move(str(self.temp_path), str(self.final_path))
-            except Exception:
-                logger.exception("Error during move - assuming it was created successfully by another process")
+            raise
+        except OSError:
+            logger.warning(
+                "Rename failed; checking destination before attempting shutil.move fallback",
+                exc_info=True,
+            )
+
+        if self.final_path.exists():
+            if self.is_complete():
+                if self._uses_custom_validator:
+                    logger.info(f"Destination validated as complete after rename race: {self.final_path}")
+                else:
+                    logger.info(f"Destination created by another process during rename attempt: {self.final_path}")
                 self._cleanup_temp()
+                return
+            raise FileExistsError(f"Destination exists but is incomplete: {self.final_path}")
+
+        try:
+            shutil.move(str(self.temp_path), str(self.final_path))
+        except FileExistsError:
+            if self.is_complete():
+                if self._uses_custom_validator:
+                    logger.info(f"Destination validated as complete during move: {self.final_path}")
+                else:
+                    logger.info(f"Destination already exists during move: {self.final_path}")
+                self._cleanup_temp()
+                return
+            raise
+        except Exception:
+            logger.exception("Move to final location failed")
+            raise
+
+        if not self.is_complete():
+            raise RuntimeError(f"Destination is incomplete after move: {self.final_path}")
 
     def _cleanup_temp(self) -> None:
         if self.temp_path.exists():
@@ -63,3 +114,22 @@ class AtomicDownloadManager:
                 shutil.rmtree(self.temp_path)
             except Exception:
                 logger.exception("Could not clean up temp directory")
+
+
+def is_openvino_model_dir(path: Path) -> bool:
+    """Return True when path has both OpenVINO XML and BIN model files."""
+    if not path.is_dir():
+        return False
+    if next(path.iterdir(), None) is None:
+        return False
+
+    has_xml_in_root = any(path.glob("*.xml"))
+    has_bin_in_root = any(path.glob("*.bin"))
+    if has_xml_in_root and has_bin_in_root:
+        return True
+
+    if has_xml_in_root and not has_bin_in_root:
+        return any(path.rglob("*.bin"))
+    if has_bin_in_root and not has_xml_in_root:
+        return any(path.rglob("*.xml"))
+    return any(path.rglob("*.xml")) and any(path.rglob("*.bin"))

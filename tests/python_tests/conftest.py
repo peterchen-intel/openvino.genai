@@ -14,7 +14,7 @@ from utils.constants import (
     get_ov_cache_downloaded_models_dir,
     get_ov_cache_converted_models_dir,
 )
-from utils.atomic_download import AtomicDownloadManager
+from utils.atomic_download import AtomicDownloadManager, is_openvino_model_dir
 from utils.network import retry_request
 
 # Configure logging
@@ -89,7 +89,7 @@ def image_generation_model(request):
     models_dir = get_ov_cache_converted_models_dir()
     model_path = Path(models_dir) / model_id / model_name
 
-    manager = AtomicDownloadManager(model_path)
+    manager = AtomicDownloadManager(model_path, is_valid_fn=is_openvino_model_dir)
 
     def convert_model(temp_path: Path) -> None:
         command = [
